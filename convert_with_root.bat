@@ -13,7 +13,7 @@ if exist "%TOOLS_DIR%magiskboot.exe" (
     echo [+] magiskboot.exe is present.
 ) else (
     echo [!] 'magiskboot.exe' not found. Attempting to download...
-    curl -L "https://github.com/KernelSU-Next/KernelSU-Next/releases/download/v1.1.1/magiskboot.exe" -o "%TOOLS_DIR%magiskboot.exe"
+    curl -L "https://github.com/CYRUS-STUDIO/MagiskBootWindows/raw/refs/heads/main/magiskboot.exe" -o "%TOOLS_DIR%magiskboot.exe"
     if exist "%TOOLS_DIR%magiskboot.exe" (echo [+] Download successful.) else (echo [!] Download failed. Aborting. & pause & exit /b)
 )
 echo.
