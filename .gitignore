@@ -9,6 +9,7 @@ output/
 python3/
 python_embed.zip
 tools/avbtool.py
+tools/kernelsu.ko
 tools/ksuinit
 tools/magiskboot.exe
 tools/tmp_patch/

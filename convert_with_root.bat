@@ -1,38 +1,59 @@
 @echo off
-setlocal
+setlocal enabledelayedexpansion
 
-echo Checking for required files...
-set "MISSING_FILE="
-if not exist "%~dp0python3\python.exe" set "MISSING_FILE=Python Environment"
-if not exist "%~dp0tools\ksuinit" set "MISSING_FILE=ksuinit"
-if not exist "%~dp0tools\magiskboot.exe" set "MISSING_FILE=magiskboot.exe"
+set "TOOLS_DIR=%~dp0tools\"
 
-if defined MISSING_FILE (
-    echo Error: Dependency '%MISSING_FILE%' is missing.
-    echo Please run 'install.bat' first to download all required files.
-    pause
-    exit /b
+echo --- Checking for required rooting tools ---
+echo.
+
+if not exist "%TOOLS_DIR%" mkdir "%TOOLS_DIR%"
+
+echo [*] Checking for magiskboot.exe...
+if exist "%TOOLS_DIR%magiskboot.exe" (
+    echo [+] magiskboot.exe is present.
+) else (
+    echo [!] 'magiskboot.exe' not found. Attempting to download...
+    curl -L "https://github.com/KernelSU-Next/KernelSU-Next/releases/download/v1.1.1/magiskboot.exe" -o "%TOOLS_DIR%magiskboot.exe"
+    if exist "%TOOLS_DIR%magiskboot.exe" (echo [+] Download successful.) else (echo [!] Download failed. Aborting. & pause & exit /b)
 )
-echo All dependencies are present.
+echo.
+
+echo [*] Checking for ksuinit...
+if exist "%TOOLS_DIR%ksuinit" (
+    echo [+] ksuinit is present.
+) else (
+    echo [!] 'ksuinit' not found. Attempting to download...
+    curl -L "https://github.com/KernelSU-Next/KernelSU-Next/releases/download/v1.1.1/ksuinit" -o "%TOOLS_DIR%ksuinit"
+    if exist "%TOOLS_DIR%ksuinit" (echo [+] Download successful.) else (echo [!] Download failed. Aborting. & pause & exit /b)
+)
+echo.
+
+echo [*] Checking for kernelsu.ko...
+if exist "%TOOLS_DIR%kernelsu.ko" (
+    echo [+] kernelsu.ko is present.
+) else (
+    echo [!] 'kernelsu.ko' not found. Attempting to download...
+    curl -L "https://github.com/KernelSU-Next/KernelSU-Next/releases/download/v1.1.1/android15-6.6_kernelsu.ko" -o "%TOOLS_DIR%kernelsu.ko"
+    if exist "%TOOLS_DIR%kernelsu.ko" (echo [+] Download successful.) else (echo [!] Download failed. Aborting. & pause & exit /b)
+)
 echo.
 
 
 set "CURRENT_DIR=%~dp0"
-set "TOOLS_DIR=%CURRENT_DIR%tools\"
 set "TMP_DIR=%TOOLS_DIR%tmp_patch\"
-set "KSU_APK_URL=https://github.com/KernelSU-Next/KernelSU-Next/releases/download/v1.1.1/KernelSU_Next_v1.1.1-spoofed_12851-release.apk"
-set "KSU_APK_NAME=KernelSU_Next_v1.1.1-spoofed_12851-release.apk"
+set "KSU_APK_URL=https://github.com/KernelSU-Next/KernelSU-Next/releases/download/v1.1.1/KernelSU_Next_v1.1.1_12851-release.apk"
+set "KSU_APK_NAME=KernelSU_Next_v1.1.1_12851-release.apk"
 
 echo Starting KernelSU Boot Image Patcher...
 
-if not exist "%CURRENT_DIR%vendor_boot.img" (
-    echo Error: vendor_boot.img not found.
+if not exist "%CURRENT_DIR%init_boot.img" (
+    echo Error: init_boot.img not found.
     pause
     exit /b
 )
 
-echo Backing up original vendor_boot.img to vendor_boot.bak.img...
-move "%CURRENT_DIR%vendor_boot.img" "%CURRENT_DIR%vendor_boot.bak.img"
+echo Backing up original init_boot.img to init_boot.bak.img...
+move "%CURRENT_DIR%init_boot.img" "%CURRENT_DIR%init_boot.bak.img"
 
 if exist "%TMP_DIR%" (
     echo Cleaning up previous temporary directory...
@@ -41,35 +62,47 @@ if exist "%TMP_DIR%" (
 mkdir "%TMP_DIR%"
 
 echo Copying files to temporary directory...
-copy "%CURRENT_DIR%vendor_boot.bak.img" "%TMP_DIR%\vendor_boot.img"
+copy "%CURRENT_DIR%init_boot.bak.img" "%TMP_DIR%init_boot.img"
 copy "%TOOLS_DIR%magiskboot.exe" "%TMP_DIR%"
-copy "%TOOLS_DIR%ksuinit" "%TMP_DIR%"
+copy "%TOOLS_DIR%ksuinit" "%TMP_DIR%init"
+copy "%TOOLS_DIR%kernelsu.ko" "%TMP_DIR%kernelsu.ko"
+
 
 cd "%TMP_DIR%"
 
 echo.
 echo Unpacking boot image...
-magiskboot.exe unpack vendor_boot.img
+magiskboot.exe unpack init_boot.img
 
 echo.
 echo Patching ramdisk...
-echo Adding /ksuinit and patching /init.
-magiskboot.exe cpio ramdisk.cpio "add 0755 /ksuinit ksuinit"
-magiskboot.exe cpio ramdisk.cpio "patch"
+magiskboot.exe cpio ramdisk.cpio "exists init" >nul 2>&1
+if !errorlevel! == 0 (
+    echo Backing up original /init to /init.real...
+    magiskboot.exe cpio ramdisk.cpio "mv init init.real"
+) else (
+    echo Original /init not found, skipping backup.
+)
+
+echo Injecting ksuinit as /init and adding kernelsu.ko...
+magiskboot.exe cpio ramdisk.cpio "add 0755 init init"
+magiskboot.exe cpio ramdisk.cpio "add 0644 kernelsu.ko kernelsu.ko"
+del init
+del kernelsu.ko
 
 echo.
 echo Repacking boot image...
-magiskboot.exe repack vendor_boot.img
+magiskboot.exe repack init_boot.img
 
 if exist "new-boot.img" (
     echo.
-    echo Renaming patched image to vendor_boot.img...
-    move "new-boot.img" "%CURRENT_DIR%vendor_boot.img"
-    echo Success: Patched image saved as '%CURRENT_DIR%vendor_boot.img'
+    echo Renaming patched image to init_boot.root.img...
+    move "new-boot.img" "%CURRENT_DIR%init_boot.root.img"
+    echo Success: Patched image saved as '%CURRENT_DIR%init_boot.root.img'
 ) else (
     echo.
     echo Error: Patched image not found. Restoring original backup.
-    move "%CURRENT_DIR%vendor_boot.bak.img" "%CURRENT_DIR%vendor_boot.img"
+    move "%CURRENT_DIR%init_boot.bak.img" "%CURRENT_DIR%init_boot.img"
 )
 
 cd "%CURRENT_DIR%"
@@ -92,6 +125,6 @@ echo.
 echo Now running convert.bat...
 echo.
 
-call convert.bat
+call convert.bat with_init_boot
 
 endlocal

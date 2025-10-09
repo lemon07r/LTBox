@@ -1,6 +1,10 @@
 @echo off
 setlocal enabledelayedexpansion
 
+if "%~1"=="with_init_boot" (
+    set "PROCESS_INIT_BOOT=true"
+)
+
 echo Checking for required files...
 set "MISSING_FILE="
 if not exist "%~dp0python3\python.exe" set "MISSING_FILE=Python Environment"
@@ -26,7 +30,6 @@ set "PATH=%~dp0tools;%PATH%"
 echo Cleaning up old folders...
 if exist output rmdir /s /q output
 echo.
-
 echo Moving and copying original images for backup...
 if not exist vendor_boot.img (
     echo vendor_boot.img not found! Aborting.
@@ -110,6 +113,68 @@ if errorlevel 1 (
 )
 echo.
 
+if defined PROCESS_INIT_BOOT if exist init_boot.root.img (
+    echo Extracting info from init_boot.bak.img...
+    "%PYTHON%" "%PY_AVBTOOL%" info_image --image init_boot.bak.img > init_info.tmp
+    if errorlevel 1 (
+        del init_info.tmp
+        echo Failed to get info from init_boot.bak.img. Aborting.
+        pause
+        exit /b
+    )
+
+    set "INIT_PROPS_FILES="
+    set /a prop_count=0
+    for /f "usebackq tokens=1,* delims=->" %%a in (`findstr /C:"Prop:" init_info.tmp`) do (
+        set /a prop_count+=1
+        set "key_part=%%a"
+        set "val_part=%%b"
+
+        rem Clean up key
+        for /f "tokens=2" %%k in ("!key_part!") do set "PROP_KEY=%%k"
+
+        rem Clean up value
+        set "PROP_VAL=!val_part:~2,-1!"
+
+        rem Write value to temp file
+        <nul (set /p ".=!PROP_VAL!") > "prop_init_!prop_count!.tmp"
+
+        rem Build argument string
+        set "INIT_PROPS_FILES=!INIT_PROPS_FILES! --prop_from_file "!PROP_KEY!:prop_init_!prop_count!.tmp""
+    )
+
+    for /f "usebackq tokens=3" %%a in (`findstr /C:"Image size:" init_info.tmp`) do ( set "INIT_IMG_SIZE=%%a" )
+    for /f "usebackq tokens=3,*" %%a in (`findstr /C:"Partition Name:" init_info.tmp`) do ( set "INIT_PART_NAME=%%a" )
+    for /f "usebackq tokens=2,*" %%a in (`findstr /C:"Salt:" init_info.tmp`) do ( set "INIT_SALT=%%a" )
+    for /f "usebackq tokens=3,*" %%a in (`findstr /C:"Rollback Index:" init_info.tmp`) do ( set "INIT_ROLLBACK_INDEX=%%a" )
+
+    del init_info.tmp
+
+    if not defined INIT_IMG_SIZE (
+        echo Failed to read INIT_IMG_SIZE from init_boot.bak.img info. Aborting.
+        pause
+        exit /b
+    )
+
+    echo Adding new hash footer to init_boot.root.img...
+    "%PYTHON%" "%PY_AVBTOOL%" add_hash_footer ^
+        --image init_boot.root.img ^
+        --partition_size !INIT_IMG_SIZE! ^
+        --partition_name !INIT_PART_NAME! ^
+        --rollback_index !INIT_ROLLBACK_INDEX! ^
+        --salt !INIT_SALT! ^
+        !INIT_PROPS_FILES!
+
+    if errorlevel 1 (
+        echo Failed to add hash footer to init_boot.root.img. Aborting.
+        if exist prop_init_*.tmp del prop_init_*.tmp
+        pause
+        exit /b
+    )
+    if exist prop_init_*.tmp del prop_init_*.tmp
+    echo.
+)
+
 echo Checking vbmeta key...
 if "!PUBLIC_KEY!"=="2597c218aae470a130f61162feaae70afd97f011" (
     echo Matched RSA4096 key.
@@ -131,13 +196,27 @@ if not defined ALGORITHM (
 echo.
 
 echo Re-signing vbmeta.img by reading from backup...
-"%PYTHON%" "%PY_AVBTOOL%" make_vbmeta_image ^
-    --output vbmeta.img ^
-    --key "%~dp0!KEY_FILE!" ^
-    --algorithm !ALGORITHM! ^
-    --padding_size 8192 ^
-    --include_descriptors_from_image vbmeta.bak.img ^
-    --include_descriptors_from_image vendor_boot_prc.img
+set "PADDING_SIZE=8192"
+if defined PROCESS_INIT_BOOT if exist init_boot.root.img set "PADDING_SIZE=4096"
+
+if defined PROCESS_INIT_BOOT if exist init_boot.root.img (
+    "%PYTHON%" "%PY_AVBTOOL%" make_vbmeta_image ^
+        --output vbmeta.img ^
+        --key "%~dp0!KEY_FILE!" ^
+        --algorithm !ALGORITHM! ^
+        --padding_size !PADDING_SIZE! ^
+        --include_descriptors_from_image vbmeta.bak.img ^
+        --include_descriptors_from_image init_boot.root.img ^
+        --include_descriptors_from_image vendor_boot_prc.img
+) else (
+    "%PYTHON%" "%PY_AVBTOOL%" make_vbmeta_image ^
+        --output vbmeta.img ^
+        --key "%~dp0!KEY_FILE!" ^
+        --algorithm !ALGORITHM! ^
+        --padding_size !PADDING_SIZE! ^
+        --include_descriptors_from_image vbmeta.bak.img ^
+        --include_descriptors_from_image vendor_boot_prc.img
+)
 
 if errorlevel 1 (
     echo Failed to re-sign vbmeta.img. Aborting.
@@ -146,9 +225,12 @@ if errorlevel 1 (
 )
 echo.
 
-echo Renaming final image to vendor_boot.img...
+echo Renaming final images...
 if exist vendor_boot_prc.img (
     ren vendor_boot_prc.img vendor_boot.img
+)
+if defined PROCESS_INIT_BOOT if exist init_boot.root.img (
+    ren init_boot.root.img init_boot.img
 )
 echo.
 
@@ -156,6 +238,7 @@ echo Moving final images to 'output' folder...
 if not exist output mkdir output
 move vendor_boot.img output
 move vbmeta.img output
+if defined PROCESS_INIT_BOOT if exist init_boot.img move init_boot.img output
 echo.
 
 echo Moving backup files to 'backup' folder...
