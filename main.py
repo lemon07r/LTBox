@@ -164,6 +164,11 @@ def extract_image_avb_info(image_path):
     if rollback_match:
         info['rollback'] = rollback_match.group(1)
         
+    flags_match = re.search(r"Flags:\s*(\d+)", header_section)
+    if flags_match:
+        info['flags'] = flags_match.group(1)
+        print(f"[Info] Parsed Flags: {info['flags']}")
+        
     for key, pattern in patterns.items():
         if key not in info:
             match = re.search(pattern, output)
@@ -179,6 +184,8 @@ def extract_image_avb_info(image_path):
             props_args.extend(["--prop", f"{key}:{val}"])
             
     info['props_args'] = props_args
+    if props_args:
+        print(f"[Info] Parsed {len(props_args) // 2} properties.")
 
     return info
 
@@ -399,9 +406,6 @@ def convert_images():
     vendor_boot_info = extract_image_avb_info(vendor_boot_bak)
     print("[+] Information extracted.\n")
 
-    prop_key = "com.android.build.vendor_boot.fingerprint"
-    prop_val = vendor_boot_info.get(prop_key)
-
     print("--- Adding Hash Footer to vendor_boot ---")
     
     for key in ['partition_size', 'name', 'rollback', 'salt']:
@@ -416,13 +420,16 @@ def convert_images():
         "--rollback_index", vendor_boot_info['rollback'],
         "--salt", vendor_boot_info['salt']
     ]
-    if prop_val:
-        with open("prop_val.tmp", "w", encoding='utf-8') as f:
-            f.write(prop_val)
-        add_hash_footer_cmd.extend(["--prop_from_file", f"{prop_key}:prop_val.tmp"])
+    
+    if 'props_args' in vendor_boot_info:
+        add_hash_footer_cmd.extend(vendor_boot_info['props_args'])
+        print(f"[+] Restoring {len(vendor_boot_info['props_args']) // 2} properties for vendor_boot.")
+
+    if 'flags' in vendor_boot_info:
+        add_hash_footer_cmd.extend(["--flags", vendor_boot_info.get('flags', '0')])
+        print(f"[+] Restoring flags for vendor_boot: {vendor_boot_info.get('flags', '0')}")
 
     run_command(add_hash_footer_cmd)
-    Path("prop_val.tmp").unlink(missing_ok=True)
     
     key_map = {
         "2597c218aae470a130f61162feaae70afd97f011": AVB_DIR / "testkey_rsa4096.pem",
@@ -446,6 +453,8 @@ def convert_images():
         "--key", str(key_file),
         "--algorithm", vbmeta_info['algorithm'],
         "--padding_size", "8192",
+        "--flags", vbmeta_info.get('flags', '0'),
+        "--rollback_index", vbmeta_info.get('rollback', '0'),
         "--include_descriptors_from_image", str(vbmeta_bak),
         "--include_descriptors_from_image", str(vendor_boot_prc)
     ]
@@ -549,6 +558,11 @@ def process_boot_image(key_map, image_to_process):
         "--salt", boot_info['salt'], 
         *boot_info.get('props_args', [])
     ]
+    
+    if 'flags' in boot_info:
+        add_footer_cmd.extend(["--flags", boot_info.get('flags', '0')])
+        print(f"[+] Restoring flags for boot: {boot_info.get('flags', '0')}")
+
     run_command(add_footer_cmd)
 
 
