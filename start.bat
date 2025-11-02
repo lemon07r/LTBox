@@ -35,21 +35,11 @@ echo   ==========================================================
 echo     LTBox - Main Menu
 echo   ==========================================================
 echo.
-echo     --- Flashing Tools ---
-echo     1. Convert ROM (PRC to ROW)
-echo     2. Dump devinfo/persist via EDL
-echo     3. Patch devinfo/persist (Region Code Reset)
-echo     4. Write devinfo/persist via EDL (Flash patched)
-echo     5. Create Rooted boot.img
-echo     6. Bypass Anti-Rollback (Firmware Downgrade)
+:: Fixed: Replaced problematic '&' with 'and'
+echo     1. Patch and Flash ROW ROM (Recommended)
+echo     2. Advanced
 echo.
-echo     --- Full Firmware Tools (RSA Firmware) ---
-echo     7. Modify XML for Update (Decrypts *.x, modifies XMLs)
-echo     8. Flash EDL (Flashes full firmware from 'image' folder)
-echo.
-echo     --- Maintenance ---
-echo     9. Clean Workspace (Remove tools and I/O folders)
-echo     10. Exit
+echo     3. Exit
 echo.
 echo   ==========================================================
 echo.
@@ -57,18 +47,57 @@ echo.
 set "CHOICE="
 set /p "CHOICE=    Enter the number for the task you want to run: "
 
-:: --- Call arguments updated with new descriptions (no special chars) ---
-if "%CHOICE%"=="1" call :run_task convert "ROM Conversion PRC to ROW"
-if "%CHOICE%"=="2" call :run_task read_edl "EDL Dump devinfo/persist"
-if "%CHOICE%"=="3" call :run_task edit_dp "Patch devinfo/persist"
-if "%CHOICE%"=="4" call :run_task write_edl "EDL Write devinfo/persist"
-if "%CHOICE%"=="5" call :run_task root "Root boot.img"
-if "%CHOICE%"=="6" call :run_task anti_rollback "Anti-Rollback Bypass"
-if "%CHOICE%"=="7" call :run_task modify_xml "Modify XML for Update"
-if "%CHOICE%"=="8" call :run_task flash_edl "Full EDL Flash"
+:: Fixed: Replaced problematic '&' with 'and'
+if "%CHOICE%"=="1" call :run_task patch_all "Full Patch and Flash ROW ROM"
+if "%CHOICE%"=="2" goto :advanced_menu
+if "%CHOICE%"=="3" goto :cleanup
 
-:: --- Modified logic for Choice 9 (Clean) ---
-if "%CHOICE%"=="9" (
+:: Handle invalid input
+echo.
+echo     [!] Invalid choice. Please enter a number from 1-3.
+pause
+goto :main_menu
+
+
+:: --- 4. Advanced Menu ---
+:advanced_menu
+cls
+echo.
+echo   ==========================================================
+echo     LTBox - Advanced Menu
+echo   ==========================================================
+echo.
+echo     1. Convert ROM (PRC to ROW)
+echo     2. Dump devinfo/persist via EDL
+echo     3. Patch devinfo/persist (Region Code Reset)
+echo     4. Write devinfo/persist via EDL (Flash patched)
+echo     5. Create Rooted boot.img
+echo     6. Bypass Anti-Rollback (Firmware Downgrade)
+echo.
+echo     --- Full Firmware Tools ---
+echo     7. Modify XML for Update (RSA Firmware)
+echo     8. Flash EDL (Full Firmware Flash)
+echo.
+echo     --- Maintenance ---
+echo     9. Clean Workspace (Remove tools and I/O folders)
+echo     10. Back to Main Menu
+echo.
+echo   ==========================================================
+echo.
+
+set "ADV_CHOICE="
+set /p "ADV_CHOICE=    Enter the number for the task you want to run: "
+
+if "%ADV_CHOICE%"=="1" call :run_task convert "ROM Conversion PRC to ROW"
+if "%ADV_CHOICE%"=="2" call :run_task read_edl "EDL Dump devinfo/persist"
+if "%ADV_CHOICE%"=="3" call :run_task edit_dp "Patch devinfo/persist"
+if "%ADV_CHOICE%"=="4" call :run_task write_edl "EDL Write devinfo/persist"
+if "%ADV_CHOICE%"=="5" call :run_task root "Root boot.img"
+if "%ADV_CHOICE%"=="6" call :run_task anti_rollback "Anti-Rollback Bypass"
+if "%ADV_CHOICE%"=="7" call :run_task modify_xml "Modify XML for Update"
+if "%ADV_CHOICE%"=="8" call :run_task flash_edl "Full EDL Flash"
+
+if "%ADV_CHOICE%"=="9" (
     cls
     echo ==========================================================
     echo  Starting Task: [Workspace Cleanup]...
@@ -85,15 +114,15 @@ if "%CHOICE%"=="9" (
     goto :cleanup
 )
 
-if "%CHOICE%"=="10" goto :cleanup
+if "%ADV_CHOICE%"=="10" goto :main_menu
 
-:: Handle invalid input
 echo.
 echo     [!] Invalid choice. Please enter a number from 1-10.
 pause
-goto :main_menu
+goto :advanced_menu
 
-:: --- 4. Task Execution Subroutine ---
+
+:: --- 5. Task Execution Subroutine ---
 :run_task
 cls
 echo ==========================================================
@@ -113,7 +142,7 @@ echo Press any key to return to the main menu...
 pause > nul
 goto :main_menu
 
-:: --- 5. Exit ---
+:: --- 6. Exit ---
 :cleanup
 endlocal
 echo.

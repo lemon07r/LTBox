@@ -95,27 +95,45 @@ def run_command(command, shell=False, check=True, env=None, capture=False):
             print(f"Stderr:\n{e.stderr.strip()}", file=sys.stderr)
         raise
 
-def check_edl_device():
-    print("[*] Checking for Qualcomm EDL (9008) device...")
+def check_edl_device(silent=False):
+    if not silent:
+        print("[*] Checking for Qualcomm EDL (9008) device...")
     try:
         result = subprocess.run(
             ['wmic', 'path', 'Win32_PnPEntity', 'where', "Name like 'Qualcomm%9008%'", 'get', 'Name'],
             capture_output=True, text=True, encoding='utf-8', errors='ignore', shell=True
         )
         if "Qualcomm" in result.stdout and "9008" in result.stdout:
-            print("[+] Qualcomm EDL device found.")
+            if not silent:
+                print("[+] Qualcomm EDL device found.")
             return True
         else:
-            print("[!] No Qualcomm EDL (9008) device found in Device Manager.")
-            print("[!] Please connect your device in EDL mode.")
+            if not silent:
+                print("[!] No Qualcomm EDL (9008) device found in Device Manager.")
+                print("[!] Please connect your device in EDL mode.")
             return False
     except FileNotFoundError:
-        print("[!] WMIC command not found. Cannot check for EDL device.", file=sys.stderr)
-        print("[!] Assuming device is connected. The script will proceed.")
-        return True
-    except Exception as e:
-        print(f"[!] Error checking for EDL device: {e}", file=sys.stderr)
+        if not silent:
+            print("[!] WMIC command not found. Cannot check for EDL device.", file=sys.stderr)
         return False
+    except Exception as e:
+        if not silent:
+            print(f"[!] Error checking for EDL device: {e}", file=sys.stderr)
+        return False
+
+def wait_for_edl():
+    print("\n--- WAITING FOR EDL DEVICE ---")
+    if check_edl_device():
+        return
+    
+    while not check_edl_device(silent=True):
+        print("[*] Waiting for Qualcomm EDL (9008) device... (Press Ctrl+C to cancel)")
+        try:
+            time.sleep(2)
+        except KeyboardInterrupt:
+            print("\n[!] EDL wait cancelled by user.")
+            raise
+    print("[+] EDL device connected.")
 
 def get_platform_executable(name):
     system = platform.system()
@@ -252,6 +270,8 @@ def wait_for_directory(directory, prompt_message):
         print(prompt_message)
         print(f"\nPlease copy the entire folder into this directory:")
         print(f" - {directory.name}{os.sep}")
+        print("\nThis is typically located at:")
+        print(r"   C:\ProgramData\RSA\Download\RomFiles\[Your_Firmware_Folder]")
         print("\nPress Enter when ready...")
         try:
             input()
@@ -600,8 +620,7 @@ def convert_images():
         print("[+] Backup complete.\n")
     except (IOError, OSError) as e:
         print(f"[!] Failed to copy input files: {e}", file=sys.stderr)
-        sys.exit(1)
-
+        raise
 
     print("--- Starting PRC/ROW Conversion ---")
     run_command([str(PYTHON_EXE), str(EDIT_IMAGES_PY), "vndrboot", str(vendor_boot_bak)])
@@ -610,7 +629,7 @@ def convert_images():
     print("\n[*] Verifying conversion result...")
     if not vendor_boot_prc.exists():
         print("[!] 'vendor_boot_prc.img' was not created. No changes made.")
-        sys.exit(1)
+        raise FileNotFoundError("vendor_boot_prc.img not created")
     print("[+] Conversion to PRC successful.\n")
 
     print("--- Extracting image information ---")
@@ -653,7 +672,7 @@ def convert_images():
     print("[*] Verifying vbmeta key...")
     if not key_file:
         print(f"[!] Public key SHA1 '{vbmeta_pubkey}' from vbmeta did not match known keys. Aborting.")
-        sys.exit(1)
+        raise KeyError(f"Unknown vbmeta public key: {vbmeta_pubkey}")
     print(f"[+] Matched {key_file.name}.\n")
 
     print("[*] Remaking 'vbmeta.img' using descriptors from backup...")
@@ -739,7 +758,7 @@ def process_boot_image(image_to_process):
     boot_bak_img = BASE_DIR / "boot.bak.img"
     if not boot_bak_img.exists():
         print(f"[!] Backup file '{boot_bak_img.name}' not found. Cannot process image.", file=sys.stderr)
-        sys.exit(1)
+        raise FileNotFoundError(f"{boot_bak_img.name} not found.")
         
     boot_info = extract_image_avb_info(boot_bak_img)
     
@@ -752,7 +771,7 @@ def process_boot_image(image_to_process):
     
     if not key_file:
         print(f"[!] Public key SHA1 '{boot_pubkey}' from boot.img did not match known keys. Cannot add footer.")
-        sys.exit(1)
+        raise KeyError(f"Unknown boot public key: {boot_pubkey}")
 
     print(f"[+] Matched {key_file.name}.")
     
@@ -805,7 +824,7 @@ def edit_devinfo_persist():
 
     if not devinfo_img.exists() and not persist_img.exists():
         print("[!] Error: 'devinfo.img' and 'persist.img' both not found in main directory. Aborting.")
-        sys.exit(1)
+        raise FileNotFoundError("devinfo.img or persist.img not found for patching.")
         
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     backup_critical_dir = BASE_DIR / f"backup_critical_{timestamp}"
@@ -867,8 +886,7 @@ def read_edl():
     wait_for_files(IMAGE_DIR, required_files, prompt)
     print(f"[+] Loader file '{EDL_LOADER_FILE.name}' found in '{IMAGE_DIR.name}'.")
 
-    if not check_edl_device():
-        sys.exit(1)
+    wait_for_edl()
         
     print("\n[*] Attempting to read 'devinfo' partition...")
     try:
@@ -897,7 +915,7 @@ def read_edl():
     print(f"[*] You can now run 'Patch devinfo/persist' (Menu 3) to patch them.")
 
 
-def write_edl():
+def write_edl(skip_reset=False):
     print("--- Starting EDL Write Process ---")
 
     edl_ng_exe = _ensure_edl_ng()
@@ -905,7 +923,7 @@ def write_edl():
     if not OUTPUT_DP_DIR.exists():
         print(f"[!] Error: Patched images folder '{OUTPUT_DP_DIR.name}' not found.", file=sys.stderr)
         print("[!] Please run 'Patch devinfo/persist' (Menu 3) first to generate the modified images.", file=sys.stderr)
-        sys.exit(1)
+        raise FileNotFoundError(f"{OUTPUT_DP_DIR.name} not found.")
     print(f"[+] Found patched images folder: '{OUTPUT_DP_DIR.name}'.")
 
     print(f"--- Waiting for EDL Loader File ---")
@@ -918,15 +936,14 @@ def write_edl():
     wait_for_files(IMAGE_DIR, required_files, prompt)
     print(f"[+] Loader file '{EDL_LOADER_FILE.name}' found in '{IMAGE_DIR.name}'.")
 
-    if not check_edl_device():
-        sys.exit(1)
+    wait_for_edl()
 
     patched_devinfo = OUTPUT_DP_DIR / "devinfo.img"
     patched_persist = OUTPUT_DP_DIR / "persist.img"
 
     if not patched_devinfo.exists() and not patched_persist.exists():
          print(f"[!] Error: Neither 'devinfo.img' nor 'persist.img' found inside '{OUTPUT_DP_DIR.name}'.", file=sys.stderr)
-         sys.exit(1)
+         raise FileNotFoundError(f"No patched images found in {OUTPUT_DP_DIR.name}.")
 
     commands_executed = False
     
@@ -955,7 +972,7 @@ def write_edl():
         else:
             print(f"\n[*] 'persist.img' not found in '{OUTPUT_DP_DIR.name}'. Skipping write.")
 
-        if commands_executed:
+        if commands_executed and not skip_reset:
             print("\n[*] Operations complete. Resetting device...")
             run_command([
                 str(edl_ng_exe),
@@ -963,19 +980,22 @@ def write_edl():
                 "reset"
             ])
             print("[+] Device reset command sent.")
+        elif skip_reset:
+            print("\n[*] Operations complete. Skipping device reset as requested.")
         else:
             print("\n[!] No partitions were written. Skipping reset.")
 
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
         print(f"[!] An error occurred during the EDL write/reset operation: {e}", file=sys.stderr)
-        sys.exit(1)
+        raise
 
-    print("\n" + "="*61)
-    print("  FRIENDLY REMINDER:")
-    print("  Please ensure you have a safe backup of your original")
-    print("  'devinfo.img' and 'persist.img' files before proceeding")
-    print("  with any manual flashing operations.")
-    print("="*61)
+    if not skip_reset:
+        print("\n" + "="*61)
+        print("  FRIENDLY REMINDER:")
+        print("  Please ensure you have a safe backup of your original")
+        print("  'devinfo.img' and 'persist.img' files before proceeding")
+        print("  with any manual flashing operations.")
+        print("="*61)
 
     print("\n--- EDL Write Process Finished ---")
 
@@ -1016,7 +1036,7 @@ def show_image_info(files):
                 [str(PYTHON_EXE), str(AVBTOOL_PY), "info_image", "--image", str(file_path)],
             )
             output_lines.append(process.stdout.strip())
-        except subprocess.CalledProcessError as e:
+        except (subprocess.CalledProcessError) as e:
             error_message = f"Failed to get info from {file_path.name}"
             print(error_message, file=sys.stderr)
             if e.stderr:
@@ -1135,8 +1155,7 @@ def anti_rollback():
     wait_for_files(IMAGE_DIR, required_loader, loader_prompt)
     print(f"[+] Loader file '{EDL_LOADER_FILE.name}' found in '{IMAGE_DIR.name}'.")
 
-    if not check_edl_device():
-        sys.exit(1)
+    wait_for_edl()
         
     print("\n[*] Attempting to read 'boot' partition...")
     try:
@@ -1148,7 +1167,7 @@ def anti_rollback():
         print(f"[+] Successfully read 'boot' to '{boot_out}'.")
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
         print(f"[!] Failed to read 'boot': {e}", file=sys.stderr)
-        sys.exit(1) 
+        raise 
 
     print("\n[*] Attempting to read 'vbmeta_system' partition...")
     try:
@@ -1160,7 +1179,7 @@ def anti_rollback():
         print(f"[+] Successfully read 'vbmeta_system' to '{vbmeta_out}'.")
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
         print(f"[!] Failed to read 'vbmeta_system': {e}", file=sys.stderr)
-        sys.exit(1) 
+        raise 
         
     print("\n--- [STEP 1] Dump complete ---")
     
@@ -1354,7 +1373,7 @@ def modify_xml():
     if not xml_files:
         print(f"[!] No '*.x' files found in '{IMAGE_DIR.name}'. Aborting.")
         shutil.rmtree(WORKING_DIR)
-        sys.exit(1)
+        raise FileNotFoundError(f"No *.x files found in {IMAGE_DIR.name}")
 
     print("\n[*] Modifying 'contents.xml'...")
     contents_xml = WORKING_DIR / "contents.xml"
@@ -1428,7 +1447,7 @@ def modify_xml():
     print("  You can now run 'Flash EDL' (Menu 8).")
     print("=" * 61)
 
-def flash_edl():
+def flash_edl(skip_reset=False):
     print("--- Starting Full EDL Flash Process ---")
     
     edl_ng_exe = _ensure_edl_ng()
@@ -1436,13 +1455,13 @@ def flash_edl():
     if not IMAGE_DIR.is_dir() or not any(IMAGE_DIR.iterdir()):
         print(f"[!] Error: The '{IMAGE_DIR.name}' folder is missing or empty.")
         print("[!] Please run 'Modify XML for Update' (Menu 7) first.")
-        sys.exit(1)
+        raise FileNotFoundError(f"{IMAGE_DIR.name} is missing or empty.")
         
     loader_path = EDL_LOADER_FILE_IMAGE
     if not loader_path.exists():
         print(f"[!] Error: EDL Loader '{loader_path.name}' not found in '{IMAGE_DIR.name}' folder.")
-        print("[!] Please copy it to the 'image' folder (from 'input_dp' or firmware).")
-        sys.exit(1)
+        print("[!] Please copy it to the 'image' folder (from firmware).")
+        raise FileNotFoundError(f"{loader_path.name} not found in {IMAGE_DIR.name}")
 
     print("\n" + "="*61)
     print("  WARNING: PROCEEDING WILL OVERWRITE FILES IN YOUR 'image'")
@@ -1479,9 +1498,7 @@ def flash_edl():
     if copied_count == 0:
         print("[*] No 'output*' folders found. Proceeding with files already in 'image' folder.")
     
-    print("\n[*] Waiting for Qualcomm EDL (9008) device...")
-    while not check_edl_device():
-        time.sleep(2)
+    wait_for_edl()
     
     print("\n--- [STEP 1] Flashing main firmware via rawprogram ---")
     raw_xmls = list(IMAGE_DIR.glob("rawprogram*.xml"))
@@ -1489,7 +1506,7 @@ def flash_edl():
     
     if not raw_xmls:
         print(f"[!] No 'rawprogram*.xml' files found in '{IMAGE_DIR.name}'. Cannot flash.")
-        sys.exit(1)
+        raise FileNotFoundError(f"No rawprogram*.xml found in {IMAGE_DIR.name}")
         
     cmd = [
         str(edl_ng_exe), 
@@ -1505,7 +1522,7 @@ def flash_edl():
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
         print(f"[!] An error occurred during main flash: {e}", file=sys.stderr)
         print("[!] The device may be in an unstable state. Do not reboot manually.")
-        sys.exit(1)
+        raise
         
     print("\n--- [STEP 2] Flashing patched devinfo/persist ---")
     
@@ -1514,21 +1531,103 @@ def flash_edl():
 
     if not OUTPUT_DP_DIR.exists() or (not patched_devinfo.exists() and not patched_persist.exists()):
         print(f"[*] '{OUTPUT_DP_DIR.name}' not found or is empty. Skipping devinfo/persist flash.")
-        print("[*] Attempting to reset device...")
+        if not skip_reset:
+            print("[*] Attempting to reset device...")
+            try:
+                run_command([
+                    str(edl_ng_exe),
+                    "--loader", str(loader_path), 
+                    "reset"
+                ])
+                print("[+] Device reset command sent.")
+            except Exception as e:
+                 print(f"[!] Failed to reset device: {e}", file=sys.stderr)
+        else:
+            print("[*] Skipping device reset as requested.")
+    else:
+        print("[*] 'output_dp' folder found. Proceeding to flash devinfo/persist...")
+        
+        print("\n[*] Resetting device back into EDL mode for devinfo/persist flash...")
         try:
             run_command([
                 str(edl_ng_exe),
                 "--loader", str(loader_path), 
-                "reset"
+                "reset", "edl"
             ])
-            print("[+] Device reset command sent.")
+            print("[+] Device reset-to-EDL command sent.")
         except Exception as e:
-             print(f"[!] Failed to reset device: {e}", file=sys.stderr)
-    else:
-        print("[*] 'output_dp' folder found. Proceeding to flash devinfo/persist...")
-        write_edl() 
+             print(f"[!] Failed to reset device to EDL: {e}", file=sys.stderr)
+             print("[!] Please manually reboot to EDL mode.")
+        
+        wait_for_edl() 
+        
+        write_edl(skip_reset=skip_reset) 
 
-    print("\n--- Full EDL Flash Process Finished ---")
+    if not skip_reset:
+        print("\n--- Full EDL Flash Process Finished ---")
+
+def patch_all():
+    print("--- Starting Automated Patch & Flash ROW ROM Process ---")
+    
+    print("\n--- [STEP 1/5] Waiting for RSA Firmware 'image' folder ---")
+    prompt = (
+        "Please copy the entire 'image' folder from your\n"
+        "         unpacked Lenovo RSA firmware into the main directory.\n"
+        r"         (Typical Location: C:\ProgramData\RSA\Download\RomFiles\...)"
+    )
+    wait_for_directory(IMAGE_DIR, prompt)
+    print("[+] 'image' folder found.")
+    
+    try:
+        print("\n" + "="*61)
+        print("  STEP 2/5: Converting ROM (PRC to ROW)")
+        print("="*61)
+        convert_images()
+        print("\n--- [STEP 2/5] ROM Conversion SUCCESS ---")
+
+        print("\n" + "="*61)
+        print("  STEP 3/5: Modifying XML Files")
+        print("="*61)
+        modify_xml()
+        print("\n--- [STEP 3/5] XML Modification SUCCESS ---")
+        
+        print("\n" + "="*61)
+        print("  STEP 4/5: Dumping devinfo/persist for patching")
+        print("="*61)
+        read_edl()
+        print("\n--- [STEP 4/5] Dump SUCCESS ---")
+        
+        print("\n" + "="*61)
+        print("  STEP 5/5: Patching devinfo/persist")
+        print("="*61)
+        edit_devinfo_persist()
+        print("\n--- [STEP 5/5] Patching SUCCESS ---")
+        
+        print("\n" + "="*61)
+        print("  [FINAL STEP] Flashing All Images via EDL")
+        print("="*61)
+        print("The device will now be flashed with all modified images.")
+        flash_edl()
+        
+        print("\n" + "=" * 61)
+        print("  FULL PROCESS COMPLETE!")
+        print("  Your device should now reboot with a patched ROW ROM.")
+        print("=" * 61)
+
+    except (subprocess.CalledProcessError, FileNotFoundError, RuntimeError, KeyError) as e:
+        print("\n" + "!" * 61)
+        print("  AN ERROR OCCURRED: Process Halted.")
+        print(f"  Error details: {e}")
+        print("!" * 61)
+        sys.exit(1)
+    except SystemExit:
+        print("\n" + "!" * 61)
+        print("  PROCESS HALTED BY SCRIPT.")
+        print("!" * 61)
+    except KeyboardInterrupt:
+        print("\n" + "!" * 61)
+        print("  PROCESS CANCELLED BY USER.")
+        print("!" * 61)
 
 
 def main():
@@ -1544,6 +1643,7 @@ def main():
     subparsers.add_parser("clean", help="Remove downloaded tools, I/O folders, and temp files.")
     subparsers.add_parser("modify_xml", help="Modify XML files from RSA firmware for flashing.")
     subparsers.add_parser("flash_edl", help="Flash the entire modified firmware via EDL.")
+    subparsers.add_parser("patch_all", help="Run the full automated ROW flashing process.")
     parser_info = subparsers.add_parser("info", help="Display AVB info for image files or directories.")
     parser_info.add_argument("files", nargs='+', help="Image file(s) or folder(s) to inspect.")
 
@@ -1568,14 +1668,18 @@ def main():
             modify_xml()
         elif args.command == "flash_edl":
             flash_edl()
+        elif args.command == "patch_all":
+            patch_all()
         elif args.command == "info":
             show_image_info(args.files)
-    except (subprocess.CalledProcessError, FileNotFoundError, RuntimeError, SystemExit) as e:
+    except (subprocess.CalledProcessError, FileNotFoundError, RuntimeError, KeyError) as e:
         if not isinstance(e, SystemExit):
             print(f"\nAn unexpected error occurred: {e}", file=sys.stderr)
-    except KeyError as e:
-        print(f"\nAn error occurred while processing image info: {e}", file=sys.stderr)
-        print("Please check if the image is valid and contains the necessary AVB metadata.", file=sys.stderr)
+    except SystemExit:
+        print("\nProcess halted by script (e.g., file not found).", file=sys.stderr)
+    except KeyboardInterrupt:
+        print("\nProcess cancelled by user.", file=sys.stderr)
+
 
     finally:
         print()
