@@ -4,7 +4,7 @@
 
 **This project is for educational purposes ONLY.**
 
-Modifying your device's boot images carries significant risks, including but not limited to, bricking your device, data loss, or voiding your warranty. The author **assumes no liability** and is not responsible for any **damage or consequence** that may occur to **your device or anyone else's device** from using these scripts.
+Modifying your device's firmware carries significant risks, including but not limited to, bricking your device, data loss, or voiding your warranty. The author **assumes no liability** and is not responsible for any **damage or consequence** that may occur to **your device or anyone else's device** from using these scripts.
 
 **You are solely responsible for any consequences. Use at your own absolute risk.**
 
@@ -21,7 +21,7 @@ This toolkit is an all-in-one collection of scripts that leverages this flaw to 
 ### Target Models
 
 * Lenovo Legion Y700 (2nd, 3rd, 4th Gen)
-* Lenovo Tab Plus AI (AKA Yoga Pad Pro AI)
+* Lenovo Tab Plus AI (aka Yoga Pad Pro AI)
 * Lenovo Xiaoxin Pad Pro GT
 
 *...Other recent Lenovo devices (released in 2024 or later with Qualcomm chipsets) may also be vulnerable.*
@@ -30,59 +30,105 @@ This toolkit is an all-in-one collection of scripts that leverages this flaw to 
 
 This toolkit provides an all-in-one solution for the following tasks **without unlocking the bootloader**:
 
-1.  **Region Conversion (PRC → ROW)**
-    * Converts the region code in `vendor_boot.img` to allow flashing a global (ROW) ROM on a Chinese (PRC) model.
-    * Re-makes the `vbmeta.img` with the AOSP test keys to validate the modified `vendor_boot`.
-2.  **Rooting**
-    * Patches the stock `boot.img` by replacing the original kernel with [one that includes KernelSU](https://github.com/WildKernels/GKI_KernelSU_SUSFS).
-    * Re-signs the patched `boot.img` with AOSP test keys.
-3.  **Region Code Reset**
-    * Modifies byte patterns in `devinfo.img` and `persist.img` to reset region-lock settings.
-4.  **EDL Partition Dump/Write**
-    * Dumps the `devinfo` and `persist` partitions directly from the device to the `backup` folder.
-    * Flashes the patched `devinfo.img` and `persist.img` from the `output_dp` folder to the device.
-5.  **Anti-Rollback (ARB) Bypass**
-    * Dumps current firmware via EDL to check rollback indices.
-    * Compares them against new firmware images provided by the user.
-    * Patches the new firmware (e.g., `boot.img`, `vbmeta_system.img`) to match the device's *current* (higher) index, allowing a downgrade.
-6.  **Full Firmware Flashing**
-    * Decrypts and patches Lenovo RSA firmware XML files (`*.x` -> `*.xml`).
-    * Automates the entire process of converting, patching, and flashing a full ROW firmware, including `devinfo`/`persist` and Anti-Rollback patches.
+1.  **Region Conversion (PRC → ROW):** Converts Chinese (PRC) firmware to Global (ROW) firmware by patching `vendor_boot.img` and rebuilding `vbmeta.img`.
 
-## 3. Prerequisites
+2.  **Get Root Access:** Replaces the kernel in `boot.img` with [GKI_KernelSU_SUSFS](https://github.com/WildKernels/GKI_KernelSU_SUSFS) for root access.
 
-Before you begin, place the required files into the correct folders. The script will guide you if files are missing.
+3.  **Anti-Rollback Bypass:** Bypasses rollback protection, allowing you to flash older (downgrade) firmware versions by patching the rollback index in `boot.img` and `vbmeta_system.img`.
 
-* **For ALL EDL Operations:**
-    * The EDL loader file (`xbl_s_devprg_ns.melf`) **MUST** be placed in the `image` folder.
+4.  **Reset Region Code:** Patches `devinfo.img` and `persist.img` (by removing "CNXX") to reset region code.
 
-* **For `Patch & Flash ROW ROM` or `Modify xml` (Advanced 8) or `Flash ROM`:**
-    * You must copy the **entire `image` folder** from your unpacked Lenovo RSA firmware (the one containing `*.x` files, `*.img` files, etc.) into the LTBox root directory.
-    * The script will prompt you for this folder. It is typically found in `C:\ProgramData\RSA\Download\RomFiles\[Firmware_Name]\`.
+5.  **Firmware Flashing:** Uses `edl-ng` to dump partitions and flash modified firmware packages in Qualcomm Emergency Download (EDL) mode.
 
-* **For `Create Rooted boot.img` or `Convert PRC to ROW`:**
-    * Place the required source `.img` files (e.g., `vendor_boot.img`, `vbmeta.img`, `boot.img`) into the `image` folder.
+6.  **Automated Process:** Provides fully automated options to perform all the above steps in the correct order, with options for both data wipe and data preservation (no wipe).
 
-* **For `devinfo/persist` patching:**
-    * **Advanced 2 (Dump):** Dumps `devinfo.img` and `persist.img` *to* the `backup` folder.
-    * **Advanced 3 (Patch):** Reads `devinfo.img` and `persist.img` *from* the `backup` folder, and saves patched versions to `output_dp`.
+## 3. How to Use
 
-* **For `Anti-Anti-Rollback`:**
-    * These tools require the **new (downgrade)** firmware's `boot.img` and `vbmeta_system.img` to be in the `image` folder for comparison.
-    * **Advanced 5 (Detect):** Will automatically dump your *current* device's firmware to `input_current` to perform the comparison.
+The toolkit is now centralized into a single menu-driven script.
 
-## 4. How to Use
+1.  **Run the Script:** Double-click **`start.bat`**.
 
-1.  **Place Files:** Put the necessary files (especially the `image` folder and/or EDL loader) into the correct location as described in **Section 3**.
-2.  **Run the Script:** Double-click `start.bat`.
-3.  **Select Task:** Choose an option from the menu.
-    * **`1` or `2`** for the main tasks.
-    * **`a`** to open the Advanced menu for individual steps.
-4.  **Get Results:** After a script finishes, the modified images will be saved in a corresponding `output*` folder (e.g., `output`, `output_root`, `output_dp`, `output_anti_rollback`).
-5.  **Flash the Images:** The `Patch & Flash` and `Flash ROM` options handle this automatically. You can also flash individual `output*` images manually using the Advanced tools.
+2.  **Install Dependencies (First Run):** The first time you run `start.bat`, it will automatically execute `ltbox\install.bat`. This will download and install all required dependencies (Python, `adb`, `edl-ng`, `avbtool`, `fetch`, etc.) into the `python3/` and `tools/` folders.
 
-## 5. Script Descriptions
+3.  **Select Task:** Choose an option from the menu.
 
-* **`start.bat`**: This is the main script you will run. It provides access to all functions.
-* **`info_image.bat`**: A separate utility script. Drag & drop `.img` file(s) or folder(s) onto this script to see AVB (Android Verified Boot) information.
-    * *Output: `image_info_*.txt`*
+    - Main Menu (1, 2, 3): For common, fully automated tasks.
+    - Advanced Menu (a): For manual, step-by-step operations.
+
+4.  **Follow Prompts:** The scripts will prompt you when you need to place files (e.g., "Waiting for image folder...") or connect your device (e.g., "Waiting for ADB/EDL device...").
+
+5.  **Get Results:** After a task finishes, modified images are saved in the corresponding `output*` folder (e.g., `output/`, `output_root/`).
+
+6.  **Flash the Images:** The Main Menu options and the "Flash Firmware" option handle this automatically. You can also flash individual `output*` images manually using the Advanced menu options.
+
+## 4. Script Descriptions
+
+### 4.1 Main Menu
+
+These are the primary, automated functions.
+
+**`1. Install ROW firmware to PRC device (WIPE DATA)`**
+
+The all-in-one automated task. It performs all steps (Convert, XML Modify, Dump, Patch, ARB Check, Flash) and **wipes all user data**.
+
+**`2. Update ROW firmware on PRC device (NO WIPE)`**
+
+Same as option 1, but modifies the XML scripts to **preserve user data** (skips `userdata` and `metadata` partitions).
+
+**`3. Create rooted boot.img`**
+
+Replaces the kernel in `boot.img` with GKI_KernelSU_SUSFS. Saves the result to `output_root/`.
+
+### 4.2 Advanced Menu
+
+These are the individual steps, allowing for manual control.
+
+**`1. Convert ROW to PRC in ROM`**
+
+Converts `vendor_boot.img` and rebuilds `vbmeta.img`. (Input: `image/`, Output: `output/`).
+
+**`2. Dump devinfo/persist from device`**
+
+Connect device in EDL mode. Dumps `devinfo` and `persist` to the `backup/` folder.
+
+**`3. Patch devinfo/persist to reset region code`**
+
+Patches "CNXX" in `devinfo.img`/`persist.img`. (Input: `backup/`, Output: `output_dp/`).
+
+**`4. Write devinfo/persist to device`**
+
+Flashes the patched images from `output_dp/` to the device via EDL.
+
+**`5. Detect Anti-Rollback from device`**
+
+Dumps current device partitions (`input_current/`) and compares their rollback indices to the new ROM (`image/`).
+
+**`6. Patch rollback indices in ROM`**
+
+If a downgrade is detected (by Step 5), this patches the new ROM's images with the device's *current* (higher) index. (Input: `image/`, Output: `output_anti_rollback/`).
+
+**`7. Write Anti-Anti-Rollback to device`**
+
+Flashes the ARB-patched images from `output_anti_rollback/` to the device via EDL.
+
+**`8. Convert x files to xml (WIPE DATA)`**
+
+Decrypts `.x` files from `image/` to `.xml` for a **full data wipe**. (Output: `output_xml/`).
+
+**`9. Convert x files to xml & Modify (NO WIPE)`**
+
+Decrypts `.x` files and modifies them to **skip user data partitions**. (Output: `output_xml/`).
+
+**`10. Flash firmware to device`**
+
+Manual full flash. It first copies all `output*` folders into `image/`, then flashes the entire `image/` folder using `edl-ng`.
+
+**`11. Clean workspace`**
+
+Deletes all `output*`, `input*`, `image`, `work` folders, downloaded tools, and temp files. Does **not** delete the `backup/` folder.
+
+## 5. Other Utilities
+
+**`info_image.bat`**
+
+It will run `avbtool.py` to get detailed info (partition name, rollback index, AVB properties) and save it to `image_info_[timestamp].txt`.

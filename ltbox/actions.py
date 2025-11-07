@@ -556,7 +556,7 @@ def _compare_rollback_indices(edl_ng_exe):
     print("\n--- [STEP 1] Dump complete ---")
     
     print("\n--- [STEP 2] Comparing Rollback Indices ---")
-    print("\n[*] Extracting current firmware rollback indices...")
+    print("\n[*] Extracting current ROM's rollback indices...")
     current_boot_rb = 0
     current_vbmeta_rb = 0
     try:
@@ -569,10 +569,10 @@ def _compare_rollback_indices(edl_ng_exe):
         print(f"[!] Error reading current image info: {e}. Please check files.", file=sys.stderr)
         return 'ERROR', 0, 0
 
-    print(f"  > Current Boot Index: {current_boot_rb}")
-    print(f"  > Current VBMeta System Index: {current_vbmeta_rb}")
+    print(f"  > Current ROM's Boot Index: {current_boot_rb}")
+    print(f"  > Current ROM's VBMeta System Index: {current_vbmeta_rb}")
 
-    print("\n[*] Extracting new firmware rollback indices (from 'image' folder)...")
+    print("\n[*] Extracting new ROM's rollback indices (from 'image' folder)...")
     new_boot_img = IMAGE_DIR / "boot.img"
     new_vbmeta_img = IMAGE_DIR / "vbmeta_system.img"
 
@@ -592,8 +592,8 @@ def _compare_rollback_indices(edl_ng_exe):
         print(f"[!] Error reading new image info: {e}. Please check files.", file=sys.stderr)
         return 'ERROR', 0, 0
 
-    print(f"  > New Boot Index: {new_boot_rb}")
-    print(f"  > New VBMeta System Index: {new_vbmeta_rb}")
+    print(f"  > New ROM's Boot Index: {new_boot_rb}")
+    print(f"  > New ROM's VBMeta System Index: {new_vbmeta_rb}")
 
     if new_boot_rb < current_boot_rb or new_vbmeta_rb < current_vbmeta_rb:
         print("\n[!] Downgrade detected! Anti-Rollback patching is REQUIRED.")
@@ -629,7 +629,7 @@ def patch_anti_rollback():
             print("\n[!] No patching is required or files are missing. Aborting patch.")
             return
 
-        print("\n--- [STEP 3] Patching New Firmware ---")
+        print("\n--- [STEP 3] Patching New ROM ---")
         
         utils.patch_chained_image_rollback(
             image_name="boot.img",
@@ -1072,9 +1072,9 @@ def flash_edl(skip_reset=False, skip_reset_edl=False):
 
 def patch_all(wipe=0):
     if wipe == 1:
-        print("--- [WIPE MODE] Starting Automated Install & Flash ROW ROM Process ---")
+        print("--- [WIPE MODE] Starting Automated Install & Flash ROW Firmware Process ---")
     else:
-        print("--- [NO WIPE MODE] Starting Automated Update & Flash ROW ROM Process ---")
+        print("--- [NO WIPE MODE] Starting Automated Update & Flash ROW Firmware Process ---")
     
     print("\n" + "="*61)
     print("  STEP 1/8: Waiting for ADB Connection")
@@ -1096,10 +1096,10 @@ def patch_all(wipe=0):
     
     try:
         print("\n" + "="*61)
-        print("  STEP 3/8: Converting ROM (PRC to ROW) & Validating Model")
+        print("  STEP 3/8: Converting Firmware (PRC to ROW) & Validating Model")
         print("="*61)
         convert_images(device_model=device_model)
-        print("\n--- [STEP 3/8] ROM Conversion & Validation SUCCESS ---")
+        print("\n--- [STEP 3/8] Firmware Conversion & Validation SUCCESS ---")
 
         print("\n" + "="*61)
         print("  STEP 4/8: Modifying XML Files")
@@ -1134,7 +1134,7 @@ def patch_all(wipe=0):
         
         print("\n" + "=" * 61)
         print("  FULL PROCESS COMPLETE!")
-        print("  Your device should now reboot with a patched ROW ROM.")
+        print("  Your device should now reboot with a patched ROW firmware.")
         print("=" * 61)
 
     except (subprocess.CalledProcessError, FileNotFoundError, RuntimeError, KeyError) as e:

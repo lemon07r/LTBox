@@ -36,9 +36,9 @@ echo   ==========================================================
 echo     LTBox - Main
 echo   ==========================================================
 echo.
-echo     1. Install ROW ROM to PRC device (WIPE DATA)
-echo     2. Update ROW ROM on PRC device (NO WIPE)
-echo     3. Create Rooted boot.img
+echo     1. Install ROW firmware to PRC device (WIPE DATA)
+echo     2. Update ROW firmware on PRC device (NO WIPE)
+echo     3. Create rooted boot.img
 echo.
 echo     a. Advanced
 echo     x. Exit
@@ -48,8 +48,8 @@ echo.
 set "CHOICE="
 set /p "CHOICE=    Enter your choice (1, 2, 3, a, x): "
 
-if /I "%CHOICE%"=="1" call :run_task patch_all_wipe "Install ROW ROM (WIPE DATA)"
-if /I "%CHOICE%"=="2" call :run_task patch_all "Update ROW ROM (NO WIPE)"
+if /I "%CHOICE%"=="1" call :run_task patch_all_wipe "Install ROW firmware (WIPE DATA)"
+if /I "%CHOICE%"=="2" call :run_task patch_all "Update ROW firmware (NO WIPE)"
 if /I "%CHOICE%"=="3" call :run_task root "Root boot.img"
 if /I "%CHOICE%"=="a" goto :advanced_menu
 if /I "%CHOICE%"=="x" goto :cleanup
@@ -78,7 +78,7 @@ echo     6. Patch rollback indices in ROM
 echo     7. Write Anti-Anti-Rollback to device
 echo     8. Convert x files to xml (WIPE DATA)
 echo     9. Convert x files to xml & Modify (NO WIPE)
-echo     10. Flash ROM to device
+echo     10. Flash firmware to device
 echo.
 echo     11. Clean workspace
 echo     m. Back to Main
@@ -97,7 +97,7 @@ if "%ADV_CHOICE%"=="6" call :run_task patch_anti_rollback "Patch rollback indice
 if "%ADV_CHOICE%"=="7" call :run_task write_anti_rollback "Write Anti-Anti-Rollback to device"
 if "%ADV_CHOICE%"=="8" call :run_task modify_xml_wipe "Convert x files to xml (WIPE DATA)"
 if "%ADV_CHOICE%"=="9" call :run_task modify_xml "Convert & Modify x files to xml (NO WIPE)"
-if "%ADV_CHOICE%"=="10" call :run_task flash_edl "Flash ROM to device"
+if "%ADV_CHOICE%"=="10" call :run_task flash_edl "Flash firmware to device"
 
 if "%ADV_CHOICE%"=="11" (
     cls
