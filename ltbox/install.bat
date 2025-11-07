@@ -58,14 +58,8 @@ if not exist "%PYTHON_DIR%\Scripts\pip.exe" (
 )
 
 :: Check Python modules
-"%PYTHON_DIR%\python.exe" -c "import requests" 2>nul || (
-    echo [*] 'requests' module not found. Installing...
-    "%PYTHON_DIR%\Scripts\pip.exe" install requests
-)
-"%PYTHON_DIR%\python.exe" -c "import cryptography" 2>nul || (
-    echo [*] 'cryptography' module not found. Installing...
-    "%PYTHON_DIR%\Scripts\pip.exe" install cryptography
-)
+echo [*] Installing required Python modules from requirements.txt...
+"%PYTHON_DIR%\Scripts\pip.exe" install -r "%BASE_DIR%requirements.txt"
 
 :: Check other tools
 if not exist "%FETCH_EXE%" (

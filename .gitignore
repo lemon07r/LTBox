@@ -1,6 +1,5 @@
 *.apk
 *.img
-*.txt
 *.zip
 backup/
 desktop.ini
