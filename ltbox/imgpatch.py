@@ -402,26 +402,46 @@ def edit_vendor_boot(input_file_path):
         print(f"An error occurred while processing '{input_file.name}': {e}", file=sys.stderr)
         sys.exit(1)
 
-def edit_devinfo_persist(country_code):
+def check_target_exists(target_code):
+    target_bytes = f"{target_code.upper()}XX".encode('ascii')
+    files_to_check = [BASE_DIR / "devinfo.img", BASE_DIR / "persist.img"]
+    found = False
+    
+    for f in files_to_check:
+        if not f.exists():
+            continue
+        try:
+            content = f.read_bytes()
+            if content.count(target_bytes) > 0:
+                found = True
+                break
+        except Exception as e:
+            print(f"[!] Error reading {f.name} for check: {e}", file=sys.stderr)
+    return found
+
+def edit_devinfo_persist(target_code, replacement_code):
     files_to_process = {
         "devinfo.img": "devinfo_modified.img",
         "persist.img": "persist_modified.img"
     }
-
-    target = b"CNXX"
     
-    if not country_code or len(country_code) != 2:
-        print(f"[!] Error: Invalid country code '{country_code}' received by patcher. Aborting.", file=sys.stderr)
+    target_string = f"{target_code.upper()}XX"
+    target = target_string.encode('ascii')
+    
+    if not replacement_code or len(replacement_code) != 2:
+        print(f"[!] Error: Invalid replacement code '{replacement_code}' received by patcher. Aborting.", file=sys.stderr)
         sys.exit(1)
         
-    replacement_string = f"{country_code.upper()}XX"
+    replacement_string = f"{replacement_code.upper()}XX"
     replacement = replacement_string.encode('ascii')
+    
+    print(f"[*] Patching target '{target_string}' with '{replacement_string}'...")
     
     total_found_count = 0
 
     for input_filename, output_filename in files_to_process.items():
-        input_file = Path(input_filename)
-        output_file = Path(output_filename)
+        input_file = BASE_DIR / input_filename
+        output_file = BASE_DIR / output_filename
 
         print(f"\n--- Processing '{input_file.name}' ---")
 
@@ -434,7 +454,7 @@ def edit_devinfo_persist(country_code):
             count = content.count(target)
             
             if count > 0:
-                print(f"Found '{target.decode('ascii')}' pattern {count} time(s). Replacing with '{replacement_string}'...")
+                print(f"Found '{target_string}' pattern {count} time(s). Replacing with '{replacement_string}'...")
                 modified_content = content.replace(target, replacement)
                 output_file.write_bytes(modified_content)
                 total_found_count += count

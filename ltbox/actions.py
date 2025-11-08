@@ -235,17 +235,15 @@ def root_boot_only():
     else:
         print("[!] Patched boot image was not created. An error occurred during the process.", file=sys.stderr)
 
-def select_country_code():
-    print("\n--- SELECT COUNTRY CODE FOR PATCHING ---")
-    print("Please select a country from the list below to patch 'CNXX' in devinfo/persist.")
-    print("This will change the region code of your device.")
+def select_country_code(prompt_message="Please select a country from the list below:"):
+    print(f"\n--- {prompt_message.upper()} ---")
 
     if not COUNTRY_CODES:
         print("[!] Error: COUNTRY_CODES not found in constants.py. Aborting.", file=sys.stderr)
         raise ImportError("COUNTRY_CODES missing from constants.py")
 
     sorted_countries = sorted(COUNTRY_CODES.items(), key=lambda item: item[1])
-
+    
     num_cols = 3
     col_width = 38 
     
@@ -264,7 +262,7 @@ def select_country_code():
 
     while True:
         try:
-            choice = input(f"Enter the number corresponding to your desired country (1-{len(sorted_countries)}): ")
+            choice = input(f"Enter the number (1-{len(sorted_countries)}): ")
             choice_idx = int(choice) - 1
             if 0 <= choice_idx < len(sorted_countries):
                 selected_code = sorted_countries[choice_idx][0]
@@ -276,7 +274,7 @@ def select_country_code():
         except ValueError:
             print("[!] Invalid input. Please enter a number.")
         except (KeyboardInterrupt, EOFError):
-            print("\n[!] Country selection cancelled by user. Exiting.")
+            print("\n[!] Selection cancelled by user. Exiting.")
             sys.exit(1)
 
 def edit_devinfo_persist():
@@ -342,10 +340,30 @@ def edit_devinfo_persist():
         shutil.rmtree(OUTPUT_DP_DIR)
     OUTPUT_DP_DIR.mkdir(exist_ok=True)
 
-    selected_country_code = select_country_code()
+    target_code = "CN"
     
-    print("[*] Running patch script...")
-    imgpatch.edit_devinfo_persist(selected_country_code)
+    while True:
+        print(f"[*] Searching for target code '{target_code}XX' in images...")
+        if imgpatch.check_target_exists(target_code):
+            print(f"[+] Found target code '{target_code}XX'.")
+            replacement_code = select_country_code("SELECT REPLACEMENT COUNTRY CODE")
+            
+            print("[*] Running patch script...")
+            imgpatch.edit_devinfo_persist(target_code, replacement_code)
+            break
+        else:
+            print(f"[!] Target code '{target_code}XX' not found in devinfo.img or persist.img.")
+            choice = ""
+            while choice not in ['y', 'n']:
+                choice = input("    Manually select a new target code to search for? (y/n): ").lower().strip()
+            
+            if choice == 'n':
+                print("[*] Skipping devinfo/persist patching.")
+                devinfo_img.unlink(missing_ok=True)
+                persist_img.unlink(missing_ok=True)
+                return
+            else:
+                target_code = select_country_code("SELECT NEW TARGET COUNTRY CODE")
 
     modified_devinfo = BASE_DIR / "devinfo_modified.img"
     modified_persist = BASE_DIR / "persist_modified.img"
