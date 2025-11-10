@@ -379,7 +379,7 @@ def edit_devinfo_persist():
     print(f"  Modified images are ready in the '{OUTPUT_DP_DIR.name}' folder.")
     print("=" * 61)
 
-def modify_xml(wipe=0):
+def modify_xml(wipe=0, skip_dp=False):
     print("--- Starting XML Modification Process ---")
     
     print("--- Waiting for 'image' folder ---")
@@ -400,6 +400,56 @@ def modify_xml(wipe=0):
 
     try:
         imgpatch.modify_xml_algo(wipe=wipe)
+
+        if not skip_dp:
+            print("\n[*] Creating custom write XMLs for devinfo/persist...")
+
+            src_persist_xml = OUTPUT_XML_DIR / "rawprogram_save_persist_unsparse0.xml"
+            dest_persist_xml = OUTPUT_XML_DIR / "rawprogram_write_persist_unsparse0.xml"
+            
+            if src_persist_xml.exists():
+                try:
+                    with open(src_persist_xml, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                    
+                    content = re.sub(
+                        r'(<program.*label="persist".*filename=")(?:")(".*/>)',
+                        r'\1persist.img\2',
+                        content,
+                        flags=re.IGNORECASE
+                    )
+                    
+                    with open(dest_persist_xml, 'w', encoding='utf-8') as f:
+                        f.write(content)
+                    print(f"[+] Created '{dest_persist_xml.name}' in '{dest_persist_xml.parent.name}'.")
+                except Exception as e:
+                    print(f"[!] Failed to create '{dest_persist_xml.name}': {e}", file=sys.stderr)
+            else:
+                print(f"[!] Warning: '{src_persist_xml.name}' not found. Cannot create persist write XML.")
+
+            src_devinfo_xml = OUTPUT_XML_DIR / "rawprogram4.xml"
+            dest_devinfo_xml = OUTPUT_XML_DIR / "rawprogram4_write_devinfo.xml"
+            
+            if src_devinfo_xml.exists():
+                try:
+                    with open(src_devinfo_xml, 'r', encoding='utf-8') as f:
+                        content = f.read()
+
+                    content = re.sub(
+                        r'(<program.*label="devinfo".*filename=")(?:")(".*/>)',
+                        r'\1devinfo.img\2',
+                        content,
+                        flags=re.IGNORECASE
+                    )
+                    
+                    with open(dest_devinfo_xml, 'w', encoding='utf-8') as f:
+                        f.write(content)
+                    print(f"[+] Created '{dest_devinfo_xml.name}' in '{dest_devinfo_xml.parent.name}'.")
+                except Exception as e:
+                    print(f"[!] Failed to create '{dest_devinfo_xml.name}': {e}", file=sys.stderr)
+            else:
+                print(f"[!] Warning: '{src_devinfo_xml.name}' not found. Cannot create devinfo write XML.")
+
     except Exception as e:
         print(f"[!] Error during XML modification: {e}", file=sys.stderr)
         raise
@@ -833,6 +883,20 @@ def flash_edl(skip_reset=False, skip_reset_edl=False, skip_dp=False):
     raw_xmls = [f for f in IMAGE_DIR.glob("rawprogram*.xml") if f.name != "rawprogram0.xml"]
     patch_xmls = list(IMAGE_DIR.glob("patch*.xml"))
     
+    if not skip_dp:
+        persist_write_xml = IMAGE_DIR / "rawprogram_write_persist_unsparse0.xml"
+        persist_save_xml = IMAGE_DIR / "rawprogram_save_persist_unsparse0.xml"
+        devinfo_write_xml = IMAGE_DIR / "rawprogram4_write_devinfo.xml"
+        devinfo_original_xml = IMAGE_DIR / "rawprogram4.xml"
+        
+        if persist_write_xml.exists():
+            print("[+] Using 'rawprogram_write_persist_unsparse0.xml' for persist flash.")
+            raw_xmls = [xml for xml in raw_xmls if xml.name != persist_save_xml.name]
+        
+        if devinfo_write_xml.exists():
+            print("[+] Using 'rawprogram4_write_devinfo.xml' for devinfo flash.")
+            raw_xmls = [xml for xml in raw_xmls if xml.name != devinfo_original_xml.name]
+
     if not raw_xmls or not patch_xmls:
         print(f"[!] Error: 'rawprogram*.xml' (excluding rawprogram0.xml) or 'patch*.xml' files not found in '{IMAGE_DIR.name}'.")
         print(f"[!] Cannot flash. Please run XML modification first.")
