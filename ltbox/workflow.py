@@ -36,6 +36,9 @@ def patch_all(wipe=0, skip_adb=False):
     device_model = device.get_device_model(skip_adb=skip_adb)
     if not device_model and not skip_adb:
         raise SystemExit("Failed to get device model via ADB.")
+    
+    active_slot_suffix = device.get_active_slot_suffix(skip_adb=skip_adb)
+    
     print("\n--- [STEP 2/9] ADB Device Found SUCCESS ---")
     
     print("\n--- [STEP 3/9] Waiting for RSA Firmware 'image' folder ---")
@@ -92,8 +95,8 @@ def patch_all(wipe=0, skip_adb=False):
         print("\n" + "="*61)
         print("  STEP 8/9: Checking and Patching Anti-Rollback")
         print("="*61)
-        actions.read_anti_rollback()
-        actions.patch_anti_rollback()
+        actions.read_anti_rollback(active_slot_suffix=active_slot_suffix)
+        actions.patch_anti_rollback(active_slot_suffix=active_slot_suffix)
         print("\n--- [STEP 8/9] Anti-Rollback Check/Patch SUCCESS ---")
         
         print("\n" + "="*61)

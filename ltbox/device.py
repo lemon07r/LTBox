@@ -43,6 +43,24 @@ def get_device_model(skip_adb=False):
         print("[!] Please ensure the device is connected and authorized.")
         return None
 
+def get_active_slot_suffix(skip_adb=False):
+    if skip_adb:
+        print("[!] Skipping active slot check as requested.")
+        return None
+    print("[*] Getting active slot suffix via ADB...")
+    try:
+        result = utils.run_command([str(ADB_EXE), "shell", "getprop", "ro.boot.slot_suffix"], capture=True)
+        suffix = result.stdout.strip()
+        if suffix not in ["_a", "_b"]:
+            print(f"[!] Warning: Could not get valid slot suffix (got '{suffix}'). Assuming non-A/B device.")
+            return None
+        print(f"[+] Found active slot suffix: {suffix}")
+        return suffix
+    except Exception as e:
+        print(f"[!] Error getting active slot suffix: {e}", file=sys.stderr)
+        print("[!] Please ensure the device is connected and authorized.")
+        return None
+
 def reboot_to_edl(skip_adb=False):
     if skip_adb:
         print("[!] You requested Skip ADB, so please reboot to EDL manually.")
