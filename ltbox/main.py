@@ -21,6 +21,25 @@ except ImportError as e:
         os.system("pause")
     sys.exit(1)
 
+COMMAND_MAP = {
+    "convert": (actions.convert_images, {}),
+    "root_device": (actions.root_device, {"skip_adb": True}),
+    "unroot_device": (actions.unroot_device, {"skip_adb": True}),
+    "disable_ota": (actions.disable_ota, {"skip_adb": True}),
+    "edit_dp": (actions.edit_devinfo_persist, {}),
+    "read_edl": (actions.read_edl, {"skip_adb": True}),
+    "write_edl": (actions.write_edl, {}),
+    "read_anti_rollback": (actions.read_anti_rollback, {}),
+    "patch_anti_rollback": (actions.patch_anti_rollback, {}),
+    "write_anti_rollback": (actions.write_anti_rollback, {}),
+    "clean": (utils.clean_workspace, {}),
+    "modify_xml": (actions.modify_xml, {"wipe": 0}),
+    "modify_xml_wipe": (actions.modify_xml, {"wipe": 1}),
+    "flash_edl": (actions.flash_edl, {}),
+    "patch_all": (workflow.patch_all, {"wipe": 0, "skip_adb": True}),
+    "patch_all_wipe": (workflow.patch_all, {"wipe": 1, "skip_adb": True}),
+}
+
 class Tee:
     def __init__(self, original_stream, log_file):
         self.original_stream = original_stream
@@ -81,38 +100,18 @@ def run_task(command, title, skip_adb=False):
     print("  " + "=" * 58, "\n")
 
     try:
-        if command == "convert":
-            actions.convert_images()
-        elif command == "root_device":
-            actions.root_device(skip_adb=skip_adb)
-        elif command == "unroot_device":
-            actions.unroot_device(skip_adb=skip_adb)
-        elif command == "disable_ota":
-            actions.disable_ota(skip_adb=skip_adb)
-        elif command == "edit_dp":
-            actions.edit_devinfo_persist()
-        elif command == "read_edl":
-            actions.read_edl(skip_adb=skip_adb)
-        elif command == "write_edl":
-            actions.write_edl()
-        elif command == "read_anti_rollback":
-            actions.read_anti_rollback()
-        elif command == "patch_anti_rollback":
-            actions.patch_anti_rollback()
-        elif command == "write_anti_rollback":
-            actions.write_anti_rollback()
-        elif command == "clean":
-            utils.clean_workspace()
-        elif command == "modify_xml":
-            actions.modify_xml(wipe=0)
-        elif command == "modify_xml_wipe":
-            actions.modify_xml(wipe=1)
-        elif command == "flash_edl":
-            actions.flash_edl()
-        elif command == "patch_all":
-            workflow.patch_all(wipe=0, skip_adb=skip_adb)
-        elif command == "patch_all_wipe":
-            workflow.patch_all(wipe=1, skip_adb=skip_adb)
+        func_tuple = COMMAND_MAP.get(command)
+        if not func_tuple:
+            print(f"[!] Unknown command: {command}", file=sys.stderr)
+            return
+        
+        func, base_kwargs = func_tuple
+        
+        final_kwargs = base_kwargs.copy()
+        if "skip_adb" in final_kwargs:
+            final_kwargs["skip_adb"] = skip_adb
+            
+        func(**final_kwargs)
             
     except (subprocess.CalledProcessError, FileNotFoundError, RuntimeError, KeyError) as e:
         if not isinstance(e, SystemExit):
