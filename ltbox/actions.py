@@ -13,7 +13,74 @@ from ltbox.constants import *
 from ltbox import utils, device, imgpatch, downloader
 from ltbox.downloader import ensure_magiskboot
 
-# --- Patch Actions ---
+def _scan_and_decrypt_xmls():
+    OUTPUT_XML_DIR.mkdir(exist_ok=True)
+    
+    xmls = list(OUTPUT_XML_DIR.glob("rawprogram*.xml"))
+    if not xmls:
+        xmls = list(IMAGE_DIR.glob("rawprogram*.xml"))
+    
+    if not xmls:
+        print("[*] No XML files found. Checking for .x files to decrypt...")
+        x_files = list(IMAGE_DIR.glob("*.x"))
+        
+        if x_files:
+            print(f"[*] Found {len(x_files)} .x files. Decrypting...")
+            utils.check_dependencies() 
+            for x_file in x_files:
+                xml_name = x_file.stem + ".xml"
+                out_path = OUTPUT_XML_DIR / xml_name
+                if not out_path.exists():
+                    print(f"  > Decrypting {x_file.name}...")
+                    if imgpatch.decrypt_file(str(x_file), str(out_path)):
+                        xmls.append(out_path)
+                    else:
+                        print(f"  [!] Failed to decrypt {x_file.name}")
+        else:
+            print("[!] No .xml or .x files found in 'image' folder.")
+            print("[!] Dump requires partition information from these files.")
+            print("    Please place firmware .xml or .x files into the 'image' folder.")
+            return []
+            
+    return xmls
+
+def _get_partition_params(target_label, xml_paths):
+    for xml_path in xml_paths:
+        try:
+            tree = ET.parse(xml_path)
+            root = tree.getroot()
+            for prog in root.findall('program'):
+                label = prog.get('label', '').lower()
+                if label == target_label.lower():
+                    return {
+                        'lun': prog.get('physical_partition_number'),
+                        'start_sector': prog.get('start_sector'),
+                        'num_sectors': prog.get('num_partition_sectors'),
+                        'filename': prog.get('filename', ''),
+                        'source_xml': xml_path.name
+                    }
+        except Exception as e:
+            print(f"[!] Error parsing {xml_path.name}: {e}")
+            
+    return None
+
+def _ensure_params_or_fail(label):
+    xmls = _scan_and_decrypt_xmls()
+    if not xmls:
+        raise FileNotFoundError("No XML/.x files found for dump.")
+        
+    params = _get_partition_params(label, xmls)
+    if not params:
+        if label == "boot":
+            params = _get_partition_params("boot_a", xmls)
+            if not params:
+                 params = _get_partition_params("boot_b", xmls)
+                 
+    if not params:
+        print(f"[!] Error: Could not find partition info for '{label}' in XMLs.")
+        raise ValueError(f"Partition '{label}' not found in XMLs")
+        
+    return params
 
 def convert_images(device_model=None, skip_adb=False):
     utils.check_dependencies()
@@ -158,7 +225,7 @@ def convert_images(device_model=None, skip_adb=False):
     print("  SUCCESS!")
     print(f"  Final images have been saved to the '{OUTPUT_DIR.name}' folder.")
     print("=" * 61)
-    
+
 def root_boot_only():
     print(f"[*] Cleaning up old '{OUTPUT_ROOT_DIR.name}' folder...")
     if OUTPUT_ROOT_DIR.exists():
@@ -520,103 +587,8 @@ def disable_ota(skip_adb=False):
 
     print("\n--- Disable OTA Process Finished ---")
 
-# --- EDL Actions ---
-
 def read_edl(skip_adb=False):
-    print("--- Starting EDL Read Process ---")
-    
-    device.setup_edl_connection(skip_adb=skip_adb)
-    
-    BACKUP_DIR.mkdir(exist_ok=True)
-    devinfo_out = BACKUP_DIR / "devinfo.img"
-    persist_out = BACKUP_DIR / "persist.img"
-
-    print("\n[*] Attempting to read 'persist' partition...")
-    try:
-        device.edl_read_part(EDL_LOADER_FILE, "persist", persist_out)
-        print(f"[+] Successfully read 'persist' to '{persist_out}'.")
-    except (subprocess.CalledProcessError, FileNotFoundError) as e:
-        print(f"[!] Failed to read 'persist': {e}", file=sys.stderr)
-
-    print("\n[*] Attempting to read 'devinfo' partition...")
-    try:
-        device.edl_read_part(EDL_LOADER_FILE, "devinfo", devinfo_out)
-        print(f"[+] Successfully read 'devinfo' to '{devinfo_out}'.")
-    except (subprocess.CalledProcessError, FileNotFoundError) as e:
-        print(f"[!] Failed to read 'devinfo': {e}", file=sys.stderr)
-
-    devinfo_size = os.path.getsize(devinfo_out) if devinfo_out.exists() else 0
-    persist_size = os.path.getsize(persist_out) if persist_out.exists() else 0
-    
-    DEVINFO_MIN_SIZE = 4 * 1024
-    PERSIST_MIN_SIZE = 32 * 1024 * 1024
-    
-    dump_error = False
-    if devinfo_out.exists() and devinfo_size < DEVINFO_MIN_SIZE:
-        print(f"[!] Error: Dumped 'devinfo.img' is too small ({devinfo_size} bytes). Expected at least 4KB.")
-        dump_error = True
-    elif not devinfo_out.exists():
-         print(f"[!] Error: 'devinfo.img' failed to dump (file not found).")
-         dump_error = True
-    
-    if persist_out.exists() and persist_size < PERSIST_MIN_SIZE:
-        print(f"[!] Error: Dumped 'persist.img' is too small ({persist_size} bytes). Expected at least 32MB.")
-        dump_error = True
-    elif not persist_out.exists():
-         print(f"[!] Error: 'persist.img' failed to dump (file not found).")
-         dump_error = True
-
-    if dump_error:
-        print("\n[!] An error occurred during the EDL dump. The files may be corrupt.")
-        print("    Please choose an option:")
-        print("    1. Skip devinfo/persist steps (Continue workflow)")
-        print("    2. Abort & stay in EDL mode")
-        print("    3. Abort & reboot to system")
-        
-        choice = ""
-        while choice not in ['1', '2', '3']:
-            choice = input("    Enter your choice (1, 2, or 3): ").lower().strip()
-        
-        if choice == '1':
-            print("[*] Skipping devinfo/persist steps...")
-            return "SKIP_DP"
-        elif choice == '2':
-            print("[*] Aborting. Staying in EDL mode...")
-            device.edl_reset(EDL_LOADER_FILE, mode="edl")
-            raise SystemExit("EDL dump failed, staying in EDL mode.")
-        elif choice == '3':
-            print("[*] Aborting. Rebooting to System...")
-            device.edl_reset(EDL_LOADER_FILE)
-            raise SystemExit("EDL dump failed, rebooting to system.")
-
-    print(f"\n--- EDL Read Process Finished ---")
-    print(f"[*] Files have been saved to the '{BACKUP_DIR.name}' folder.")
-    print(f"[*] You can now run 'Patch devinfo/persist' (Menu 3) to patch them.")
-    return "SUCCESS"
-
-def _parse_xml_for_dump(xml_path, label_target):
-    if not xml_path.exists():
-        print(f"[!] Warning: XML '{xml_path.name}' not found. Cannot parse for '{label_target}'.")
-        return None
-        
-    try:
-        tree = ET.parse(xml_path)
-        root = tree.getroot()
-        for prog in root.findall('program'):
-            if prog.get('label') == label_target:
-                return {
-                    'start_sector': prog.get('start_sector'),
-                    'num_sectors': prog.get('num_partition_sectors'),
-                    'lun': prog.get('physical_partition_number')
-                }
-        print(f"[!] Warning: Label '{label_target}' not found in '{xml_path.name}'.")
-        return None
-    except Exception as e:
-        print(f"[!] Error parsing '{xml_path.name}': {e}")
-        return None
-
-def read_edl_fhloader(skip_adb=False):
-    print("--- Starting EDL Read Process (fh_loader) ---")
+    print("--- Starting Dump Process (fh_loader) ---")
     
     port = device.setup_edl_connection(skip_adb=skip_adb)
     
@@ -624,105 +596,43 @@ def read_edl_fhloader(skip_adb=False):
         device.load_firehose_programmer(EDL_LOADER_FILE, port)
         time.sleep(2)
     except Exception as e:
-        print(f"[!] Warning: Failed to load programmer: {e}")
-        print("[!] Proceeding, as it might already be loaded.")
+        print(f"[!] Warning: Programmer loading issue (might be already loaded): {e}")
 
     BACKUP_DIR.mkdir(exist_ok=True)
-    devinfo_out = BACKUP_DIR / "devinfo.img"
-    persist_out = BACKUP_DIR / "persist.img"
-
-    print("\n[*] Parsing XML files for partition information...")
     
-    devinfo_xml = OUTPUT_XML_DIR / "rawprogram4.xml"
-    devinfo_params = _parse_xml_for_dump(devinfo_xml, "devinfo")
-
-    persist_xml = OUTPUT_XML_DIR / "rawprogram_save_persist_unsparse0.xml"
-    persist_params = _parse_xml_for_dump(persist_xml, "persist")
-
-    if devinfo_params:
-        print("\n[*] Attempting to read 'devinfo' partition using fh_loader...")
+    targets = ["devinfo", "persist"]
+    
+    for target in targets:
+        out_file = BACKUP_DIR / f"{target}.img"
+        print(f"\n[*] Preparing to dump '{target}'...")
+        
         try:
+            params = _ensure_params_or_fail(target)
+            print(f"  > Found info in {params['source_xml']}: LUN={params['lun']}, Start={params['start_sector']}")
+            
             device.fh_loader_read_part(
                 port=port,
-                output_filename=str(devinfo_out),
-                lun=devinfo_params['lun'],
-                start_sector=devinfo_params['start_sector'],
-                num_sectors=devinfo_params['num_sectors']
+                output_filename=str(out_file),
+                lun=params['lun'],
+                start_sector=params['start_sector'],
+                num_sectors=params['num_sectors']
             )
-            print(f"[+] Successfully read 'devinfo' to '{devinfo_out}'.")
+            print(f"[+] Successfully read '{target}' to '{out_file.name}'.")
+            
+        except (ValueError, FileNotFoundError) as e:
+            print(f"[!] Skipping '{target}': {e}")
         except Exception as e:
-            print(f"[!] Failed to read 'devinfo': {e}", file=sys.stderr)
-    else:
-        print("[!] Skipping devinfo dump (XML params not found).")
+            print(f"[!] Failed to read '{target}': {e}", file=sys.stderr)
 
-    if persist_params:
-        print("\n[*] Attempting to read 'persist' partition using fh_loader...")
-        try:
-            device.fh_loader_read_part(
-                port=port,
-                output_filename=str(persist_out),
-                lun=persist_params['lun'],
-                start_sector=persist_params['start_sector'],
-                num_sectors=persist_params['num_sectors']
-            )
-            print(f"[+] Successfully read 'persist' to '{persist_out}'.")
-        except Exception as e:
-            print(f"[!] Failed to read 'persist': {e}", file=sys.stderr)
-    else:
-        print("[!] Skipping persist dump (XML params not found).")
+    print("\n[*] Resetting device to system...")
+    device.fh_loader_reset(port)
+    print("[+] Reset command sent.")
 
-    devinfo_size = os.path.getsize(devinfo_out) if devinfo_out.exists() else 0
-    persist_size = os.path.getsize(persist_out) if persist_out.exists() else 0
-    
-    DEVINFO_MIN_SIZE = 4 * 1024
-    PERSIST_MIN_SIZE = 32 * 1024 * 1024
-    
-    dump_error = False
-    if devinfo_out.exists() and devinfo_size < DEVINFO_MIN_SIZE:
-        print(f"[!] Error: Dumped 'devinfo.img' is too small ({devinfo_size} bytes). Expected at least 4KB.")
-        dump_error = True
-    elif not devinfo_out.exists() and devinfo_params:
-         print(f"[!] Error: 'devinfo.img' failed to dump (file not found).")
-         dump_error = True
-    
-    if persist_out.exists() and persist_size < PERSIST_MIN_SIZE:
-        print(f"[!] Error: Dumped 'persist.img' is too small ({persist_size} bytes). Expected at least 32MB.")
-        dump_error = True
-    elif not persist_out.exists() and persist_params:
-         print(f"[!] Error: 'persist.img' failed to dump (file not found).")
-         dump_error = True
+    print(f"\n--- Dump Process Finished ---")
+    print(f"[*] Files saved to: {BACKUP_DIR.name}")
 
-    if dump_error:
-        print("\n[!] An error occurred during the fh_loader dump. The files may be corrupt.")
-        print("    Please choose an option:")
-        print("    1. Skip devinfo/persist steps (Continue workflow)")
-        print("    2. Abort & stay in EDL mode")
-        print("    3. Abort & reboot to system")
-        
-        choice = ""
-        while choice not in ['1', '2', '3']:
-            choice = input("    Enter your choice (1, 2, or 3): ").lower().strip()
-        
-        if choice == '1':
-            print("[*] Skipping devinfo/persist steps...")
-            return "SKIP_DP"
-        elif choice == '2':
-            print("[*] Aborting. Staying in EDL mode...")
-            raise SystemExit("EDL dump failed, staying in EDL mode.")
-        elif choice == '3':
-            print("[*] Aborting. Rebooting to System...")
-            try:
-                cmd = [str(FH_LOADER_EXE), f"--port=\\\\.\\{port}", "--reset", "--noprompt"]
-                utils.run_command(cmd)
-            except:
-                pass
-            raise SystemExit("EDL dump failed, rebooting to system.")
-
-    print(f"\n--- EDL Read Process Finished ---")
-    print(f"[*] Files have been saved to the '{BACKUP_DIR.name}' folder.")
-    print(f"[*] You can now run 'Patch devinfo/persist' (Menu 3) to patch them.")
-    return "SUCCESS"
-
+def read_edl_fhloader(skip_adb=False):
+    return read_edl(skip_adb)
 
 def write_edl(skip_reset=False, skip_reset_edl=False):
     print("--- Starting Write Process (Fastboot) ---")
@@ -737,22 +647,22 @@ def write_edl(skip_reset=False, skip_reset_edl=False):
 
     if not skip_adb:
         print("[*] checking device state...")
-
+        
         if device.check_fastboot_device(silent=True):
             print("[+] Device is already in Fastboot mode.")
-
+        
         else:
             edl_port = device.check_edl_device(silent=True)
             if edl_port:
                 print(f"[!] Device found in EDL mode ({edl_port}).")
-                print("[*] Resetting to System via edl-ng to prepare for Fastboot...")
+                print("[*] Resetting to System via fh_loader to prepare for Fastboot...")
                 try:
-                    device.edl_reset(EDL_LOADER_FILE)
+                    device.fh_loader_reset(edl_port)
                     print("[+] Reset command sent. Waiting for device to boot...")
                     time.sleep(10)
                 except Exception as e:
                     print(f"[!] Warning: Failed to reset from EDL: {e}")
-
+            
             try:
                 device.wait_for_adb(skip_adb=False)
                 device.reboot_to_bootloader(skip_adb=False)
@@ -1092,7 +1002,6 @@ def flash_edl(skip_reset=False, skip_reset_edl=False, skip_dp=False):
 def root_device(skip_adb=False):
     print("--- Starting Root Device Process ---")
     
-    print(f"[*] Cleaning up old '{OUTPUT_ROOT_DIR.name}' and '{WORKING_BOOT_DIR.name}' folders...")
     if OUTPUT_ROOT_DIR.exists():
         shutil.rmtree(OUTPUT_ROOT_DIR)
     if WORKING_BOOT_DIR.exists():
@@ -1129,7 +1038,12 @@ def root_device(skip_adb=False):
             print("[!] Spoofed APK not found. Skipping installation.")
     
     print("\n--- [STEP 2/6] Rebooting to EDL Mode ---")
-    device.setup_edl_connection(skip_adb=skip_adb)
+    port = device.setup_edl_connection(skip_adb=skip_adb)
+    try:
+        device.load_firehose_programmer(EDL_LOADER_FILE, port)
+        time.sleep(2)
+    except Exception as e:
+        print(f"[!] Warning: Programmer loading issue: {e}")
 
     print("\n--- [STEP 3/6] Dumping boot_a partition ---")
     dumped_boot_img = WORKING_BOOT_DIR / "boot.img"
@@ -1137,10 +1051,18 @@ def root_device(skip_adb=False):
     base_boot_bak = BASE_DIR / "boot.bak.img"
 
     try:
-        device.edl_read_part(EDL_LOADER_FILE, "boot_a", dumped_boot_img)
-        print(f"[+] Successfully read 'boot_a' to '{dumped_boot_img}'.")
-    except (subprocess.CalledProcessError, FileNotFoundError) as e:
-        print(f"[!] Failed to read 'boot_a': {e}", file=sys.stderr)
+        params = _ensure_params_or_fail("boot")
+        print(f"  > Found info in {params['source_xml']}: LUN={params['lun']}, Start={params['start_sector']}")
+        device.fh_loader_read_part(
+            port=port,
+            output_filename=str(dumped_boot_img),
+            lun=params['lun'],
+            start_sector=params['start_sector'],
+            num_sectors=params['num_sectors']
+        )
+        print(f"[+] Successfully read 'boot' to '{dumped_boot_img}'.")
+    except (subprocess.CalledProcessError, FileNotFoundError, ValueError) as e:
+        print(f"[!] Failed to read 'boot': {e}", file=sys.stderr)
         raise
 
     print(f"[*] Backing up original boot.img to '{backup_boot_img.parent.name}' folder...")
@@ -1169,16 +1091,30 @@ def root_device(skip_adb=False):
     shutil.move(patched_boot_path, final_boot_img)
     print(f"[+] Patched boot image saved to '{final_boot_img.parent.name}' folder.")
 
-    print("\n--- [STEP 6/6] Flashing patched boot.img to boot_a ---")
+    print("\n--- [STEP 6/6] Flashing patched boot.img via Fastboot ---")
+    print("[*] Resetting to Fastboot mode...")
+    device.fh_loader_reset(port)
+    
+    if not skip_adb:
+        try:
+            print("[*] Waiting for device to reboot (10s)...")
+            time.sleep(10)
+            device.wait_for_adb(skip_adb=False)
+            device.reboot_to_bootloader(skip_adb=False)
+        except Exception:
+             print("[!] ADB reboot failed. Checking for Fastboot manually...")
+
+    device.wait_for_fastboot()
+
     try:
-        device.edl_write_part(EDL_LOADER_FILE, "boot_a", final_boot_img)
-        print("[+] Successfully wrote patched 'boot.img' to 'boot_a'.")
+        print(f"[*] Flashing 'boot' partition...")
+        utils.run_command([str(FASTBOOT_EXE), "flash", "boot", str(final_boot_img)])
+        print("[+] Successfully flashed 'boot.img'.")
         
-        print("\n[*] Operations complete. Resetting device...")
-        device.edl_reset(EDL_LOADER_FILE)
-        print("[+] Device reset command sent.")
+        print("\n[*] Rebooting to system...")
+        utils.run_command([str(FASTBOOT_EXE), "reboot"])
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
-        print(f"[!] An error occurred during the EDL write/reset operation: {e}", file=sys.stderr)
+        print(f"[!] An error occurred during Fastboot flash: {e}", file=sys.stderr)
         raise
     finally:
         base_boot_bak.unlink(missing_ok=True)
@@ -1192,13 +1128,20 @@ def unroot_device(skip_adb=False):
     backup_boot_file = BACKUP_BOOT_DIR / "boot.img"
     BACKUP_BOOT_DIR.mkdir(exist_ok=True)
 
-    print("\n--- [STEP 1/5] Waiting for ADB Connection ---")
-    device.wait_for_adb(skip_adb=skip_adb)
+    print("\n--- [STEP 1/4] Waiting for ADB Connection ---")
     
-    print("\n--- [STEP 2/5] Rebooting to EDL Mode ---")
-    device.setup_edl_connection(skip_adb=skip_adb)
+    if not skip_adb:
+        try:
+            device.wait_for_adb(skip_adb=skip_adb)
+            device.reboot_to_bootloader(skip_adb=skip_adb)
+        except Exception:
+             print("[!] ADB reboot failed. Proceeding to manual Fastboot check...")
+    else:
+         print("[!] Skip ADB is ON. Please manually enter Fastboot mode.")
+
+    device.wait_for_fastboot()
     
-    print("\n--- [STEP 3/5] Checking for backup boot.img ---")
+    print("\n--- [STEP 2/4] Checking for backup boot.img ---")
     if not backup_boot_file.exists():
         prompt = (
             "[!] Backup file 'boot.img' not found.\n"
@@ -1209,20 +1152,18 @@ def unroot_device(skip_adb=False):
     
     print("[+] Stock backup 'boot.img' found.")
 
-    print("\n--- [STEP 4/5] Flashing stock boot.img to boot_a ---")
+    print("\n--- [STEP 3/4] Flashing stock boot.img via Fastboot ---")
     try:
-        device.edl_write_part(EDL_LOADER_FILE, "boot_a", backup_boot_file)
-        print("[+] Successfully wrote stock 'boot.img' to 'boot_a'.")
+        utils.run_command([str(FASTBOOT_EXE), "flash", "boot", str(backup_boot_file)])
+        print("[+] Successfully flashed stock 'boot.img'.")
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
-        print(f"[!] An error occurred during the EDL write operation: {e}", file=sys.stderr)
+        print(f"[!] An error occurred during Fastboot flash: {e}", file=sys.stderr)
         raise
 
-    print("\n--- [STEP 5/5] Resetting device ---")
+    print("\n--- [STEP 4/4] Rebooting device ---")
     try:
-        device.edl_reset(EDL_LOADER_FILE)
-        print("[+] Device reset command sent.")
+        utils.run_command([str(FASTBOOT_EXE), "reboot"])
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
-        print(f"[!] An error occurred during the EDL reset operation: {e}", file=sys.stderr)
-        raise
+        print(f"[!] An error occurred during reboot: {e}", file=sys.stderr)
 
     print("\n--- Unroot Device Process Finished ---")

@@ -11,7 +11,6 @@ from pathlib import Path
 from ltbox.constants import *
 from ltbox import utils, downloader
 
-# --- ADB Device Handling ---
 def wait_for_adb(skip_adb=False):
     if skip_adb:
         print("[!] Skipping ADB connection as requested.")
@@ -86,8 +85,6 @@ def reboot_to_bootloader(skip_adb=False):
     except Exception as e:
         print(f"[!] Failed to send reboot command: {e}", file=sys.stderr)
         raise
-
-# --- Fastboot Device Handling ---
 
 def check_fastboot_device(silent=False):
     if not silent:
@@ -179,8 +176,7 @@ def get_fastboot_vars(skip_adb=False):
             except Exception:
                 pass
         raise
-        
-# --- EDL Device Handling ---
+
 def check_edl_device(silent=False):
     if not silent:
         print("[*] Checking for Qualcomm EDL (9008) device...")
@@ -243,27 +239,6 @@ def setup_edl_connection(skip_adb=False):
     print("--- [EDL Setup] Device Connected ---")
     return port
 
-# --- EDL-NG Wrappers ---
-def _run_edl_command(loader_path, args_list):
-    edl_ng_exe = utils.get_platform_executable("edl-ng")
-    base_cmd = [str(edl_ng_exe), "--loader", str(loader_path)]
-    base_cmd.extend(args_list)
-    return utils.run_command(base_cmd)
-
-def edl_read_part(loader_path, partition, output_file):
-    return _run_edl_command(loader_path, ["read-part", partition, str(output_file)])
-
-def edl_write_part(loader_path, partition, input_file):
-    return _run_edl_command(loader_path, ["write-part", partition, str(input_file)])
-
-def edl_reset(loader_path, mode=None):
-    cmd = ["reset"]
-    if mode == "edl":
-        cmd.extend(["--mode", "edl"])
-    return _run_edl_command(loader_path, cmd)
-
-# --- FH_LOADER Wrappers (Alternative to EDL-NG) ---
-
 def load_firehose_programmer(loader_path, port):
     if not QSAHARASERVER_EXE.exists():
         raise FileNotFoundError(f"QSaharaServer.exe not found at {QSAHARASERVER_EXE}")
@@ -312,6 +287,21 @@ def fh_loader_read_part(port, output_filename, lun, start_sector, num_sectors, m
     except subprocess.CalledProcessError as e:
         print(f"[!] Error executing fh_loader: {e}", file=sys.stderr)
         raise
+
+def fh_loader_reset(port):
+    if not FH_LOADER_EXE.exists():
+        raise FileNotFoundError(f"fh_loader.exe not found at {FH_LOADER_EXE}")
+        
+    port_str = f"\\\\.\\{port}"
+    print(f"[*] Resetting device via fh_loader on {port}...")
+    
+    cmd_fh = [
+        str(FH_LOADER_EXE),
+        f"--port={port_str}",
+        "--reset",
+        "--noprompt"
+    ]
+    utils.run_command(cmd_fh)
 
 def edl_rawprogram(loader_path, memory_type, raw_xmls, patch_xmls, port):
     if not QSAHARASERVER_EXE.exists() or not FH_LOADER_EXE.exists():

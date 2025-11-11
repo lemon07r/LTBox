@@ -211,70 +211,6 @@ def ensure_magiskboot():
     except ToolError:
         sys.exit(1)
 
-def ensure_edl_ng():
-    if EDL_NG_EXE.exists() and LIBUSB_DLL.exists():
-        return
-
-    print("[!] 'edl-ng.exe' or 'libusb-1.0.dll' not found. Attempting to download...")
-    DOWNLOAD_DIR.mkdir(exist_ok=True)
-    
-    arch = platform.machine()
-    asset_patterns = {
-        'AMD64': "edl-ng-windows-x64.zip",
-        'ARM64': "edl-ng-windows-arm64.zip",
-    }
-    asset_pattern = asset_patterns.get(arch)
-    if not asset_pattern:
-        print(f"[!] Unsupported architecture: {arch} for edl-ng. Aborting.", file=sys.stderr)
-        raise ToolError(f"Unsupported architecture for edl-ng")
-
-    print(f"[*] Detected {arch} architecture. Downloading asset matching '{asset_pattern}'...")
-
-    try:
-        fetch_command = [
-            "--repo", EDL_NG_REPO_URL,
-            "--tag", EDL_NG_TAG,
-            "--release-asset", asset_pattern, str(DOWNLOAD_DIR)
-        ]
-        _run_fetch_command(fetch_command)
-
-        downloaded_zips = list(DOWNLOAD_DIR.glob("*edl-ng*.zip"))
-        if not downloaded_zips:
-            raise FileNotFoundError("Failed to find downloaded zip for edl-ng")
-
-        downloaded_zip_path = downloaded_zips[0]
-
-        with zipfile.ZipFile(downloaded_zip_path, 'r') as zip_ref:
-            extracted_files = 0
-            for member in zip_ref.infolist():
-                if member.is_dir():
-                    continue
-                    
-                file_name = Path(member.filename).name
-                target_path = None
-
-                if file_name == "edl-ng.exe":
-                    target_path = EDL_NG_EXE
-                elif file_name == "libusb-1.0.dll":
-                    target_path = LIBUSB_DLL
-                
-                if target_path:
-                    with zip_ref.open(member) as source, open(target_path, "wb") as target:
-                        shutil.copyfileobj(source, target)
-                    print(f"[+] Extracted {file_name}")
-                    extracted_files += 1
-
-            if extracted_files < 2:
-                 print("[!] Warning: Could not find both edl-ng.exe and libusb-1.0.dll in the archive.")
-
-        downloaded_zip_path.unlink()
-        print("[+] edl-ng download and extraction successful.")
-
-    except Exception as e:
-        print(f"[!] Error downloading or extracting edl-ng: {e}", file=sys.stderr)
-        raise ToolError(f"Failed to ensure edl-ng")
-
-
 def get_gki_kernel(kernel_version, work_dir):
     print("\n[3/8] Downloading GKI Kernel with fetch...")
     asset_pattern = f".*{kernel_version}.*Normal-AnyKernel3.zip"
@@ -325,7 +261,6 @@ if __name__ == "__main__":
             ensure_fetch()
             ensure_platform_tools()
             ensure_avb_tools()
-            ensure_edl_ng()
             print("--- Base Tools Installation Complete ---")
         except Exception as e:
             print(f"\n[!] An error occurred during base tool installation: {e}", file=sys.stderr)
