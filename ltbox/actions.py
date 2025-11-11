@@ -961,6 +961,32 @@ def flash_edl(skip_reset=False, skip_reset_edl=False, skip_dp=False):
 
     port = device.setup_edl_connection(skip_adb=skip_adb)
 
+    print("[*] Ensuring clean EDL state via System Reboot loop...")
+    
+    try:
+        device.fh_loader_reset(port)
+    except Exception as e:
+        print(f"[!] Warning: fh_loader reset failed: {e}")
+
+    if skip_adb:
+        print("\n" + "="*60)
+        print("  [CLEANUP] Device has been reset to System to clear port state.")
+        print("  [ACTION]  Please manually reboot your device to EDL mode again.")
+        print("            (Power off -> Hold Vol+ & Plug USB, or generic key combo)")
+        print("="*60 + "\n")
+        port = device.wait_for_edl()
+    else:
+        print("[*] Waiting for device to boot to System (ADB)...")
+        try:
+            device.wait_for_adb() 
+            print("[*] Rebooting to EDL...")
+            device.reboot_to_edl()
+            port = device.wait_for_edl()
+            time.sleep(3)
+        except Exception as e:
+             print(f"[!] Auto-reboot failed: {e}. Please check device.")
+             port = device.wait_for_edl()
+
     raw_xmls = [f for f in IMAGE_DIR.glob("rawprogram*.xml") if f.name != "rawprogram0.xml"]
     patch_xmls = list(IMAGE_DIR.glob("patch*.xml"))
     
