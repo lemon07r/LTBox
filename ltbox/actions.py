@@ -439,6 +439,11 @@ def edit_devinfo_persist():
             print("[*] Operation cancelled. No changes made.")
             devinfo_img.unlink(missing_ok=True)
             persist_img.unlink(missing_ok=True)
+
+            print("[*] Safety: Removing stock devinfo.img/persist.img from 'image' folder to prevent accidental flash.")
+            (IMAGE_DIR / "devinfo.img").unlink(missing_ok=True)
+            (IMAGE_DIR / "persist.img").unlink(missing_ok=True)
+
             return
 
     if proceed:
@@ -998,20 +1003,23 @@ def flash_edl(skip_reset=False, skip_reset_edl=False, skip_dp=False):
     devinfo_write_xml = IMAGE_DIR / "rawprogram4_write_devinfo.xml"
     devinfo_original_xml = IMAGE_DIR / "rawprogram4.xml"
 
-    if persist_write_xml.exists() and (IMAGE_DIR / "persist.img").exists() and not skip_dp:
-        print("[+] Using 'rawprogram_write_persist_unsparse0.xml' for persist flash.")
+    has_patched_persist = (OUTPUT_DP_DIR / "persist.img").exists()
+    has_patched_devinfo = (OUTPUT_DP_DIR / "devinfo.img").exists()
+
+    if persist_write_xml.exists() and has_patched_persist and not skip_dp:
+        print("[+] Using 'rawprogram_write_persist_unsparse0.xml' for persist flash (Patched).")
         raw_xmls = [xml for xml in raw_xmls if xml.name != persist_save_xml.name]
     else:
         if persist_write_xml.exists() and any(xml.name == persist_write_xml.name for xml in raw_xmls):
-             print("[*] Skipping 'persist' flash (Image missing or skipped).")
+             print("[*] Skipping 'persist' flash (Not patched, preserving device data).")
              raw_xmls = [xml for xml in raw_xmls if xml.name != persist_write_xml.name]
 
-    if devinfo_write_xml.exists() and (IMAGE_DIR / "devinfo.img").exists() and not skip_dp:
-        print("[+] Using 'rawprogram4_write_devinfo.xml' for devinfo flash.")
+    if devinfo_write_xml.exists() and has_patched_devinfo and not skip_dp:
+        print("[+] Using 'rawprogram4_write_devinfo.xml' for devinfo flash (Patched).")
         raw_xmls = [xml for xml in raw_xmls if xml.name != devinfo_original_xml.name]
     else:
         if devinfo_write_xml.exists() and any(xml.name == devinfo_write_xml.name for xml in raw_xmls):
-             print("[*] Skipping 'devinfo' flash (Image missing or skipped).")
+             print("[*] Skipping 'devinfo' flash (Not patched, preserving device data).")
              raw_xmls = [xml for xml in raw_xmls if xml.name != devinfo_write_xml.name]
 
     if not raw_xmls or not patch_xmls:
