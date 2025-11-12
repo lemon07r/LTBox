@@ -308,8 +308,8 @@ def main():
         choice = input("    Enter your choice: ").strip().lower()
 
         actions_map = {
-            "1": ("patch_all_wipe", "Install ROW firmware (WIPE DATA)"),
-            "2": ("patch_all", "Update ROW firmware (NO WIPE)"),
+            "1": ("patch_all_wipe", "Install firmware to PRC device (WIPE DATA)"),
+            "2": ("patch_all", "Update firmware on PRC device (NO WIPE)"),
             "3": ("disable_ota", "Disable OTA"),
             "4": ("root_device", "Root device"),
             "5": ("unroot_device", "Unroot device"),
