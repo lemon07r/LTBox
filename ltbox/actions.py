@@ -1090,6 +1090,9 @@ def root_device(skip_adb=False):
 
     print("\n--- [STEP 3/6] Dumping boot_a partition ---")
     
+    params = None
+    final_boot_img = OUTPUT_ROOT_DIR / "boot.img"
+    
     with utils.temporary_workspace(WORKING_BOOT_DIR):
         dumped_boot_img = WORKING_BOOT_DIR / "boot.img"
         backup_boot_img = BACKUP_BOOT_DIR / "boot.img"
@@ -1115,7 +1118,9 @@ def root_device(skip_adb=False):
         print(f"[*] Creating temporary backup for AVB processing...")
         shutil.copy(dumped_boot_img, base_boot_bak)
         print("[+] Backups complete.")
-
+        print("\n[*] Dumping complete. Resetting to System to prepare for clean EDL Write...")
+        device.fh_loader_reset(port)
+        
         print("\n--- [STEP 4/6] Patching dumped boot.img ---")
         patched_boot_path = imgpatch.patch_boot_with_root_algo(WORKING_BOOT_DIR, magiskboot_exe)
 
@@ -1132,40 +1137,38 @@ def root_device(skip_adb=False):
             base_boot_bak.unlink(missing_ok=True)
             raise
 
-        final_boot_img = OUTPUT_ROOT_DIR / "boot.img"
         shutil.move(patched_boot_path, final_boot_img)
         print(f"[+] Patched boot image saved to '{final_boot_img.parent.name}' folder.")
 
         base_boot_bak.unlink(missing_ok=True)
 
-    print("\n--- [STEP 6/6] Flashing patched boot.img via Fastboot ---")
-    print("[*] Resetting to Fastboot mode...")
-    
-    print("[*] Waiting 5 seconds for stability...")
-    time.sleep(5)
-    
-    device.fh_loader_reset(port)
+    print("\n--- [STEP 6/6] Flashing patched boot.img via EDL ---")
     
     if not skip_adb:
-        try:
-            print("[*] Waiting for device to reboot (10s)...")
-            time.sleep(10)
-            device.wait_for_adb(skip_adb=False)
-            device.reboot_to_bootloader(skip_adb=False)
-        except Exception:
-             print("[!] ADB reboot failed. Checking for Fastboot manually...")
+        print("[*] Waiting for device to boot to System (ADB)...")
+        device.wait_for_adb(skip_adb=False)
+    else:
+        print("[!] Skip ADB is ON. Please manually reboot to EDL if not already handled.")
 
-    device.wait_for_fastboot()
+    print("[*] Rebooting to EDL for flashing...")
+    port = device.setup_edl_connection(skip_adb=skip_adb)
+
+    if not params:
+         params = _ensure_params_or_fail("boot")
 
     try:
-        print(f"[*] Flashing 'boot' partition...")
-        utils.run_command([str(FASTBOOT_EXE), "flash", "boot", str(final_boot_img)])
-        print("[+] Successfully flashed 'boot.img'.")
+        device.fh_loader_write_part(
+            port=port,
+            image_path=final_boot_img,
+            lun=params['lun'],
+            start_sector=params['start_sector']
+        )
+        print("[+] Successfully flashed 'boot.img' via EDL.")
         
-        print("\n[*] Rebooting to system...")
-        utils.run_command([str(FASTBOOT_EXE), "reboot"])
+        print("\n[*] Resetting to system...")
+        device.fh_loader_reset(port)
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
-        print(f"[!] An error occurred during Fastboot flash: {e}", file=sys.stderr)
+        print(f"[!] An error occurred during EDL flash: {e}", file=sys.stderr)
         raise
 
     print("\n--- Root Device Process Finished ---")
@@ -1177,19 +1180,16 @@ def unroot_device(skip_adb=False):
     backup_boot_file = BACKUP_BOOT_DIR / "boot.img"
     BACKUP_BOOT_DIR.mkdir(exist_ok=True)
 
-    print("\n--- [STEP 1/4] Waiting for ADB Connection ---")
-    
-    if not skip_adb:
-        try:
-            device.wait_for_adb(skip_adb=skip_adb)
-            device.reboot_to_bootloader(skip_adb=skip_adb)
-        except Exception:
-             print("[!] ADB reboot failed. Proceeding to manual Fastboot check...")
-    else:
-         print("[!] Skip ADB is ON. Please manually enter Fastboot mode.")
+    print("\n--- [STEP 1/4] Checking Requirements ---")
+    if not list(IMAGE_DIR.glob("rawprogram*.xml")) and not list(IMAGE_DIR.glob("*.x")):
+         print(f"[!] Error: No firmware XMLs found in '{IMAGE_DIR.name}'.")
+         print("[!] Unroot via EDL requires partition info from firmware XMLs.")
+         prompt = (
+            "[STEP 1] Please copy the entire 'image' folder from your\n"
+            "         unpacked Lenovo RSA firmware into the main directory."
+         )
+         utils.wait_for_directory(IMAGE_DIR, prompt)
 
-    device.wait_for_fastboot()
-    
     print("\n--- [STEP 2/4] Checking for backup boot.img ---")
     if not backup_boot_file.exists():
         prompt = (
@@ -1201,18 +1201,27 @@ def unroot_device(skip_adb=False):
     
     print("[+] Stock backup 'boot.img' found.")
 
-    print("\n--- [STEP 3/4] Flashing stock boot.img via Fastboot ---")
-    try:
-        utils.run_command([str(FASTBOOT_EXE), "flash", "boot", str(backup_boot_file)])
-        print("[+] Successfully flashed stock 'boot.img'.")
-    except (subprocess.CalledProcessError, FileNotFoundError) as e:
-        print(f"[!] An error occurred during Fastboot flash: {e}", file=sys.stderr)
-        raise
+    print("\n--- [STEP 3/4] Rebooting to EDL Mode ---")
+    port = device.setup_edl_connection(skip_adb=skip_adb)
 
-    print("\n--- [STEP 4/4] Rebooting device ---")
+    print("\n--- [STEP 4/4] Flashing stock boot.img via EDL ---")
     try:
-        utils.run_command([str(FASTBOOT_EXE), "reboot"])
-    except (subprocess.CalledProcessError, FileNotFoundError) as e:
-        print(f"[!] An error occurred during reboot: {e}", file=sys.stderr)
+        params = _ensure_params_or_fail("boot")
+        print(f"  > Found info in {params['source_xml']}: LUN={params['lun']}, Start={params['start_sector']}")
+        
+        device.fh_loader_write_part(
+            port=port,
+            image_path=backup_boot_file,
+            lun=params['lun'],
+            start_sector=params['start_sector']
+        )
+        print("[+] Successfully flashed stock 'boot.img'.")
+        
+        print("\n[*] Resetting to system...")
+        device.fh_loader_reset(port)
+        
+    except (subprocess.CalledProcessError, FileNotFoundError, ValueError) as e:
+        print(f"[!] An error occurred during EDL flash: {e}", file=sys.stderr)
+        raise
 
     print("\n--- Unroot Device Process Finished ---")

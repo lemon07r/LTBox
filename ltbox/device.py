@@ -66,7 +66,6 @@ def get_active_slot_suffix(skip_adb=False):
 def get_active_slot_suffix_from_fastboot():
     print("[*] Getting active slot suffix via Fastboot...")
     try:
-        # fastboot getvar current-slot output is typically 'current-slot: a' (on stderr or stdout)
         result = utils.run_command([str(FASTBOOT_EXE), "getvar", "current-slot"], capture=True, check=False)
         output = result.stderr.strip() + "\n" + result.stdout.strip()
         
@@ -324,6 +323,39 @@ def fh_loader_read_part(port, output_filename, lun, start_sector, num_sectors, m
         subprocess.run(cmd_fh, cwd=dest_dir, env=env, check=True)
     except subprocess.CalledProcessError as e:
         print(f"[!] Error executing fh_loader: {e}", file=sys.stderr)
+        raise
+
+def fh_loader_write_part(port, image_path, lun, start_sector, memory_name="UFS"):
+    if not FH_LOADER_EXE.exists():
+        raise FileNotFoundError(f"fh_loader.exe not found at {FH_LOADER_EXE}")
+
+    image_file = Path(image_path).resolve()
+    work_dir = image_file.parent
+    filename = image_file.name
+    
+    port_str = f"\\\\.\\{port}"
+    
+    cmd_fh = [
+        str(FH_LOADER_EXE),
+        f"--port={port_str}",
+        f"--sendimage={filename}",
+        f"--lun={lun}",
+        f"--start_sector={start_sector}",
+        f"--memoryname={memory_name}",
+        "--noprompt",
+        "--zlpawarehost=1"
+    ]
+    
+    print(f"[*] Flashing -> {filename} to LUN:{lun}, Start:{start_sector}...")
+    
+    env = os.environ.copy()
+    env['PATH'] = str(TOOLS_DIR) + os.pathsep + str(DOWNLOAD_DIR) + os.pathsep + env['PATH']
+
+    try:
+        subprocess.run(cmd_fh, cwd=work_dir, env=env, check=True)
+        print(f"[+] Successfully flashed '{filename}'.")
+    except subprocess.CalledProcessError as e:
+        print(f"[!] Error executing fh_loader write: {e}", file=sys.stderr)
         raise
 
 def fh_loader_reset(port):
