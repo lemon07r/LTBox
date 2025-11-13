@@ -348,17 +348,14 @@ def select_country_code(prompt_message: str = "Please select a country from the 
         print(lang.get("act_err_codes_missing", "[!] Error: COUNTRY_CODES not found in constants.py. Aborting."), file=sys.stderr)
         raise ImportError(lang.get("act_err_codes_missing_exc", "COUNTRY_CODES missing from constants.py"))
 
-    other_countries = {k: v for k, v in COUNTRY_CODES.items() if k != "00"}
-    sorted_countries = sorted(other_countries.items(), key=lambda item: item[1])
+    sorted_countries = sorted(COUNTRY_CODES.items(), key=lambda item: item[1])
     
     num_cols = 3
     col_width = 38 
     
     line_width = col_width * num_cols
     print("-" * line_width)
-
-    print(f"  0. NULL (00)".ljust(col_width))
-
+    
     for i in range(0, len(sorted_countries), num_cols):
         line = []
         for j in range(num_cols):
@@ -371,18 +368,7 @@ def select_country_code(prompt_message: str = "Please select a country from the 
 
     while True:
         try:
-            prompt = lang.get("act_enter_num", "Enter the number (0-{len}): ").format(len=len(sorted_countries))
-            if "(1-" in prompt:
-                prompt = prompt.replace("(1-", "(0-")
-            
-            choice = input(prompt)
-
-            if choice.strip() == "0":
-                selected_code = "00"
-                selected_name = "NULL"
-                print(lang.get("act_selected", "[+] You selected: {name} ({code})").format(name=selected_name, code=selected_code))
-                return selected_code
-
+            choice = input(lang.get("act_enter_num", "Enter the number (1-{len}): ").format(len=len(sorted_countries)))
             choice_idx = int(choice) - 1
             if 0 <= choice_idx < len(sorted_countries):
                 selected_code = sorted_countries[choice_idx][0]
