@@ -35,32 +35,23 @@ def patch_all(wipe: int = 0, skip_adb: bool = False) -> None:
     print("="*61)
     
     dev = device.DeviceController(skip_adb=skip_adb)
+
+    active_slot_suffix = actions.detect_active_slot_robust(dev, skip_adb)
+    
     device_model: Optional[str] = None
-    active_slot_suffix: Optional[str] = None
 
     if not skip_adb:
-        dev.wait_for_adb()
-        device_model = dev.get_device_model()
-        if not device_model:
-            raise SystemExit("Failed to get device model via ADB.")
-        active_slot_suffix = dev.get_active_slot_suffix()
-        
-        print("\n--- [STEP 2/9] Device Info Check SUCCESS ---")
-        print("[*] Device will boot back to system if needed. Waiting for ADB connection again...")
-        dev.wait_for_adb()
-        print("[+] ADB device connected.")
+        try:
+            device_model = dev.get_device_model()
+            if not device_model:
+                raise SystemExit("CRITICAL ERROR: Failed to get device model via ADB. Aborting for safety.")
+            else:
+                print(f"[+] Device Model: {device_model}")
+        except Exception as e:
+             raise SystemExit(f"CRITICAL ERROR: Error getting device model: {e}")
 
-    else:
-        print("[!] Skip ADB is ON. Switching to Fastboot for slot detection.")
-        print("    Please manually boot your device into FASTBOOT mode.")
-        dev.wait_for_fastboot()
-        
-        active_slot_suffix = dev.get_active_slot_suffix_from_fastboot()
-        
-        print("\n--- [STEP 2/9] Device Info Check (Fastboot) FINISHED ---")
-        print("[*] Note: Device is currently in Fastboot mode.")
-        print("[*] For the next steps, you will need to switch to EDL mode manually")
-        print("    or rely on the script waiting for EDL connection.")
+    print(f"[+] Active Slot: {active_slot_suffix if active_slot_suffix else 'Unknown'}")
+    print("\n--- [STEP 2/9] Device Info Check FINISHED ---")
 
     print("\n--- [STEP 3/9] Waiting for RSA Firmware 'image' folder ---")
     prompt = (

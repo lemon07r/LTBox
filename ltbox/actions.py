@@ -83,7 +83,7 @@ def _ensure_params_or_fail(label: str) -> Dict[str, Any]:
         
     return params
 
-def _detect_active_slot_robust(dev: device.DeviceController, skip_adb: bool) -> Optional[str]:
+def detect_active_slot_robust(dev: device.DeviceController, skip_adb: bool) -> Optional[str]:
     active_slot = None
 
     if not skip_adb:
@@ -1094,7 +1094,7 @@ def root_device(skip_adb=False):
     if not skip_adb:
         dev.wait_for_adb()
 
-    active_slot = _detect_active_slot_robust(dev, skip_adb)
+    active_slot = detect_active_slot_robust(dev, skip_adb)
 
     if active_slot:
         print(f"[+] Active slot confirmed: {active_slot}")
@@ -1256,7 +1256,7 @@ def unroot_device(skip_adb=False):
     if not skip_adb:
         dev.wait_for_adb()
     
-    active_slot = _detect_active_slot_robust(dev, skip_adb)
+    active_slot = detect_active_slot_robust(dev, skip_adb)
     
     if active_slot:
         print(f"[+] Active slot confirmed: {active_slot}")
