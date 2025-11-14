@@ -401,7 +401,7 @@ class DeviceController:
     ) -> None:
         if not const.QSAHARASERVER_EXE.exists() or not const.FH_LOADER_EXE.exists():
             print(get_string("device_err_tools_missing").format(dir=const.TOOLS_DIR.name))
-            raise FileNotFoundError("Missing fh_loader/Qsaharaserver executables")
+            raise FileNotFoundError(get_string("device_err_edl_tools_missing"))
         
         port_str = f"\\\\.\\{port}"
         search_path = str(loader_path.parent)

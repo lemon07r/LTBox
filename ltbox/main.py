@@ -28,7 +28,7 @@ def setup_console():
             import ctypes
             ctypes.windll.kernel32.SetConsoleTitleW(u"LTBox")
         except Exception as e:
-            print(f"[!] Warning: Failed to set console title: {e}", file=sys.stderr)
+            print(get_string("warn_set_console_title").format(e=e), file=sys.stderr)
 
 from .i18n import get_string
 
@@ -310,8 +310,8 @@ def entry_point():
                 errors='ignore'
             )
         except (subprocess.CalledProcessError, FileNotFoundError) as e:
-            print(f"[!] Critical Error: Failed to install base tools: {e}", file=sys.stderr)
-            print("[!] Please run 'ltbox/install.bat' manually and try again.", file=sys.stderr)
+            print(get_string("critical_err_base_tools").format(e=e), file=sys.stderr)
+            print(get_string("err_run_install_manually"), file=sys.stderr)
             if platform.system() == "Windows":
                 os.system("pause")
             sys.exit(1)
@@ -346,9 +346,9 @@ def entry_point():
             avb_patch_module = avb
 
         except ImportError as e:
-            print(f"[!] Error: Failed to import 'ltbox' package.", file=sys.stderr)
-            print(f"[!] Details: {e}", file=sys.stderr)
-            print(f"[!] Please ensure the 'ltbox' folder and its files are present.", file=sys.stderr)
+            print(get_string("err_import_ltbox"), file=sys.stderr)
+            print(get_string("err_details").format(e=e), file=sys.stderr)
+            print(get_string("err_ensure_ltbox_present"), file=sys.stderr)
             if platform.system() == "Windows":
                 os.system("pause")
             sys.exit(1)

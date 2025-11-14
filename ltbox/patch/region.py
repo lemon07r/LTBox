@@ -49,7 +49,7 @@ def edit_vendor_boot(input_file_path: str) -> None:
     output_file = input_file.parent / "vendor_boot_prc.img"
     
     if not utils._process_binary_file(input_file, output_file, _patch_vendor_boot_logic, copy_if_unchanged=True):
-        raise RuntimeError("Failed to process vendor_boot binary.")
+        raise RuntimeError(get_string("err_process_vendor_boot"))
 
 def detect_region_codes() -> Dict[str, Optional[str]]:
     results: Dict[str, Optional[str]] = {}

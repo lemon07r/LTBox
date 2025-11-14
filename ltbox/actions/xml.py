@@ -58,7 +58,7 @@ def _modify_xml_algo(wipe: int = 0) -> None:
     if not processed_files:
         print(get_string("img_xml_no_files").format(dir=const.IMAGE_DIR.name))
         shutil.rmtree(const.OUTPUT_XML_DIR)
-        raise FileNotFoundError(f"No .x or .xml files in {const.IMAGE_DIR.name}")
+        raise FileNotFoundError(get_string("img_xml_no_files").format(dir=const.IMAGE_DIR.name))
 
     rawprogram4 = const.OUTPUT_XML_DIR / "rawprogram4.xml"
     rawprogram_unsparse4 = const.OUTPUT_XML_DIR / "rawprogram_unsparse4.xml"
@@ -79,13 +79,13 @@ def _modify_xml_algo(wipe: int = 0) -> None:
             tree.write(rawprogram4, encoding='utf-8', xml_declaration=True)
             
             if devinfo_modified:
-                print(f"  > Created {rawprogram4.name} with 'devinfo' filename cleared.")
+                print(get_string("img_xml_created_raw4_devinfo").format(name=rawprogram4.name))
             else:
-                print(f"  > Created {rawprogram4.name} (no 'devinfo.img' found/modified).")
+                print(get_string("img_xml_created_raw4_no_devinfo").format(name=rawprogram4.name))
                 
         except Exception as e:
-            print(f"[!] Error processing {rawprogram_unsparse4.name}: {e}", file=sys.stderr)
-            print("  > Fallback: Simply copying file.")
+            print(get_string("img_xml_err_process_raw4").format(name=rawprogram_unsparse4.name, e=e), file=sys.stderr)
+            print(get_string("img_xml_fallback_copy"))
             shutil.copy(rawprogram_unsparse4, rawprogram4)
 
     print(get_string("img_xml_mod_raw"))
@@ -113,7 +113,7 @@ def _modify_xml_algo(wipe: int = 0) -> None:
                     break
             
             if found_candidate:
-                print(f"[*] Fallback found: {found_candidate.name}. Creating {rawprogram_save.name}...")
+                print(get_string("img_xml_fallback_found").format(src=found_candidate.name, dst=rawprogram_save.name))
                 try:
                     tree = ET.parse(found_candidate)
                     root = tree.getroot()
@@ -127,17 +127,17 @@ def _modify_xml_algo(wipe: int = 0) -> None:
                     tree.write(rawprogram_save, encoding='utf-8', xml_declaration=True)
                     
                     if persist_found:
-                        print(f"  > Created {rawprogram_save.name} (persist filename cleared).")
+                        print(get_string("img_xml_created_save_persist").format(name=rawprogram_save.name))
                     else:
-                        print(f"  [!] Warning: 'persist' label not found in {found_candidate.name}. Created anyway.")
+                        print(get_string("img_xml_warn_persist_missing").format(name=found_candidate.name))
 
                 except Exception as e:
-                    print(f"[!] Error processing fallback {found_candidate.name}: {e}", file=sys.stderr)
+                    print(get_string("img_xml_err_process_fallback").format(name=found_candidate.name, e=e), file=sys.stderr)
                     raise
             else:
                 print(get_string("img_xml_critical_missing").format(f1=rawprogram_save.name, f2=rawprogram_fallback.name))
                 print(get_string("img_xml_abort_mod"))
-                raise FileNotFoundError(f"Critical XML file missing: {rawprogram_save.name} or fallbacks")
+                raise FileNotFoundError(get_string("img_xml_critical_missing").format(f1=rawprogram_save.name, f2=rawprogram_fallback.name))
 
     try:
         tree = ET.parse(rawprogram_save)
@@ -214,7 +214,7 @@ def modify_xml(wipe: int = 0, skip_dp: bool = False) -> None:
                         if modified:
                             print(get_string("act_created_persist_xml").format(name=dest_persist_xml.name, parent=dest_persist_xml.parent.name))
                         else:
-                            print(f"[!] Warning: 'persist' label not found in {src_persist_xml.name}")
+                            print(get_string("act_warn_persist_label_missing").format(name=src_persist_xml.name))
                     except Exception as e:
                         print(get_string("act_err_create_persist_xml").format(name=dest_persist_xml.name, e=e), file=sys.stderr)
                 else:
@@ -237,7 +237,7 @@ def modify_xml(wipe: int = 0, skip_dp: bool = False) -> None:
                         if modified:
                             print(get_string("act_created_devinfo_xml").format(name=dest_devinfo_xml.name, parent=dest_devinfo_xml.parent.name))
                         else:
-                            print(f"[!] Warning: 'devinfo' label not found in {src_devinfo_xml.name}")
+                            print(get_string("act_warn_devinfo_label_missing").format(name=src_devinfo_xml.name))
                     except Exception as e:
                         print(get_string("act_err_create_devinfo_xml").format(name=dest_devinfo_xml.name, e=e), file=sys.stderr)
                 else:

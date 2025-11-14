@@ -36,7 +36,7 @@ def download_resource(url: str, dest_path: Path) -> None:
         print(msg_err, file=sys.stderr)
         if dest_path.exists():
             dest_path.unlink()
-        raise ToolError(f"Download failed for {dest_path.name}")
+        raise ToolError(get_string("dl_err_download_tool").format(name=dest_path.name))
 
 def extract_archive_files(archive_path: Path, extract_map: Dict[str, Path]) -> None:
     msg = get_string("dl_extracting").format(filename=archive_path.name)
@@ -66,13 +66,13 @@ def extract_archive_files(archive_path: Path, extract_map: Dict[str, Path]) -> N
     except Exception as e:
         msg_err = get_string("dl_extract_failed").format(filename=archive_path.name, error=e)
         print(msg_err, file=sys.stderr)
-        raise ToolError(f"Extraction failed for {archive_path.name}")
+        raise ToolError(get_string("dl_err_extract_tool").format(name=archive_path.name))
 
 def _run_fetch_command(args: List[str]) -> subprocess.CompletedProcess:
     fetch_exe = const.DOWNLOAD_DIR / "fetch.exe"
     if not fetch_exe.exists():
         print(get_string("dl_fetch_not_found"))
-        raise FileNotFoundError("fetch.exe not found")
+        raise FileNotFoundError(get_string("dl_fetch_not_found"))
     
     command = [str(fetch_exe)] + args
     return utils.run_command(command, capture=True)
@@ -96,7 +96,7 @@ def _ensure_tool_from_github_release(
     if not asset_pattern:
         msg = get_string("dl_unsupported_arch").format(arch=arch, tool_name=tool_name)
         print(msg, file=sys.stderr)
-        raise ToolError(f"Unsupported architecture for {tool_name}")
+        raise ToolError(msg)
 
     msg = get_string("dl_detect_arch").format(arch=arch, pattern=asset_pattern)
     print(msg)
@@ -112,7 +112,7 @@ def _ensure_tool_from_github_release(
 
         downloaded_zips = list(const.DOWNLOAD_DIR.glob(f"*{tool_name}*.zip"))
         if not downloaded_zips:
-            raise FileNotFoundError(f"Failed to find downloaded zip for {tool_name}")
+            raise FileNotFoundError(get_string("dl_err_zip_not_found").format(tool_name=tool_name))
 
         downloaded_zip_path = downloaded_zips[0]
 
@@ -124,7 +124,7 @@ def _ensure_tool_from_github_release(
                     break
             
             if not exe_info:
-                raise FileNotFoundError(f"'{exe_name_in_zip}' not found inside {downloaded_zip_path.name}")
+                raise FileNotFoundError(get_string("dl_err_exe_in_zip_not_found").format(exe_name=exe_name_in_zip, zip_name=downloaded_zip_path.name))
 
             zip_ref.extract(exe_info, path=const.DOWNLOAD_DIR)
             extracted_path = const.DOWNLOAD_DIR / exe_info.filename
@@ -146,7 +146,7 @@ def _ensure_tool_from_github_release(
     except Exception as e:
         msg_err = get_string("dl_tool_failed").format(tool_name=tool_name, error=e)
         print(msg_err, file=sys.stderr)
-        raise ToolError(f"Failed to ensure {tool_name}")
+        raise ToolError(msg_err)
 
 def ensure_fetch() -> Path:
     tool_exe = const.DOWNLOAD_DIR / "fetch.exe"
@@ -163,7 +163,7 @@ def ensure_fetch() -> Path:
     arch = platform.machine()
     asset_name = asset_patterns.get(arch)
     if not asset_name:
-         raise ToolError(f"Unsupported architecture for fetch: {arch}")
+         raise ToolError(get_string("dl_err_unsupported_arch_fetch").format(arch=arch))
 
     url = f"{const.FETCH_REPO_URL}/releases/download/{const.FETCH_VERSION}/{asset_name}"
     download_resource(url, tool_exe)
@@ -199,7 +199,7 @@ def ensure_platform_tools() -> None:
         print(msg_err, file=sys.stderr)
         if temp_zip_path.exists():
             temp_zip_path.unlink()
-        raise ToolError("Failed to process platform-tools")
+        raise ToolError(msg_err)
 
 def ensure_avb_tools() -> None:
     key1 = const.DOWNLOAD_DIR / "testkey_rsa4096.pem"

@@ -13,19 +13,19 @@ _fallback_data = {}
 def select_language() -> str:
     os.system('cls' if os.name == 'nt' else 'clear')
     if not LANG_DIR.is_dir():
-        print(f"[!] Critical Error: Language directory not found.", file=sys.stderr)
-        print(f"[!] Expected path: {LANG_DIR}", file=sys.stderr)
+        print(get_string("err_lang_dir_not_found"), file=sys.stderr)
+        print(get_string("err_lang_dir_expected").format(path=LANG_DIR), file=sys.stderr)
         if platform.system() == "Windows":
             os.system("pause")
-        raise RuntimeError(f"Language directory not found: {LANG_DIR}")
+        raise RuntimeError(get_string("err_lang_dir_not_found_exc").format(path=LANG_DIR))
 
     lang_files = sorted(list(LANG_DIR.glob("*.json")))
     if not lang_files:
-        print(f"[!] Critical Error: No language files (*.json) found in:", file=sys.stderr)
-        print(f"[!] Path: {LANG_DIR}", file=sys.stderr)
+        print(get_string("err_no_lang_files"), file=sys.stderr)
+        print(get_string("err_no_lang_files_path").format(path=LANG_DIR), file=sys.stderr)
         if platform.system() == "Windows":
             os.system("pause")
-        raise RuntimeError(f"No language files found in {LANG_DIR}")
+        raise RuntimeError(get_string("err_no_lang_files_exc").format(path=LANG_DIR))
 
     available_languages = {}
     menu_options = []
@@ -43,17 +43,17 @@ def select_language() -> str:
         menu_options.append(f"     {i}. {lang_name}")
 
     print("\n  " + "=" * 58)
-    print("     Select Language")
+    print(get_string("menu_lang_title"))
     print("  " + "=" * 58 + "\n")
     print("\n".join(menu_options))
     print("\n  " + "=" * 58 + "\n")
 
     choice = ""
     while choice not in available_languages:
-        prompt = f"    Enter your choice (1-{len(available_languages)}): "
+        prompt = get_string("menu_lang_prompt").format(len=len(available_languages))
         choice = input(prompt).strip()
         if choice not in available_languages:
-            print(f"    [!] Invalid choice. Please enter a number from 1 to {len(available_languages)}.")
+            print(get_string("menu_lang_invalid").format(len=len(available_languages)))
     
     return available_languages[choice]
 
@@ -66,7 +66,7 @@ def load_lang(lang_code: str = "en"):
             with open(fallback_file, 'r', encoding='utf-8') as f:
                 _fallback_data = json.load(f)
         except Exception as e:
-            print(f"[!] Failed to load fallback language en.json: {e}", file=sys.stderr)
+            print(get_string("err_load_fallback_lang").format(e=e), file=sys.stderr)
             _fallback_data = {}
 
     if lang_code == "en" or not (LANG_DIR / f"{lang_code}.json").exists():
@@ -77,7 +77,7 @@ def load_lang(lang_code: str = "en"):
             with open(lang_file, 'r', encoding='utf-8') as f:
                 _lang_data = json.load(f)
         except Exception as e:
-            print(f"[!] Failed to load language {lang_code}, using fallback: {e}", file=sys.stderr)
+            print(get_string("err_load_lang").format(lang_code=lang_code, e=e), file=sys.stderr)
             _lang_data = _fallback_data
 
 def get_string(key: str, default: str = "") -> str:

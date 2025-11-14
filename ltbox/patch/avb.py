@@ -17,7 +17,7 @@ def _load_avbtool():
         return _avbtool_module
 
     if not const.AVBTOOL_PY.exists():
-        raise FileNotFoundError(f"avbtool not found at: {const.AVBTOOL_PY}")
+        raise FileNotFoundError(get_string("err_avbtool_not_found").format(path=const.AVBTOOL_PY))
 
     try:
         spec = importlib.util.spec_from_file_location("avbtool_lib", const.AVBTOOL_PY)
@@ -28,7 +28,7 @@ def _load_avbtool():
             _avbtool_module = module
             return module
     except Exception as e:
-        raise RuntimeError(f"Failed to load avbtool: {e}")
+        raise RuntimeError(get_string("err_avbtool_load_fail").format(e=e))
     
     return _avbtool_module
 
@@ -92,7 +92,7 @@ def extract_image_avb_info(image_path: Path) -> Dict[str, Any]:
 def _run_avbtool_main(args: List[str]) -> None:
     avbtool = _load_avbtool()
     if not avbtool:
-        raise RuntimeError("avbtool module not loaded")
+        raise RuntimeError(get_string("err_avbtool_not_loaded"))
     
     original_argv = sys.argv
     try:
@@ -220,7 +220,7 @@ def process_boot_image_avb(image_to_process: Path) -> None:
     boot_bak_img = const.BASE_DIR / "boot.bak.img"
     if not boot_bak_img.exists():
         print(get_string("img_err_boot_bak_missing").format(name=boot_bak_img.name), file=sys.stderr)
-        raise FileNotFoundError(f"{boot_bak_img.name} not found.")
+        raise FileNotFoundError(get_string("img_err_boot_bak_missing").format(name=boot_bak_img.name))
         
     boot_info = extract_image_avb_info(boot_bak_img)
     
@@ -233,7 +233,7 @@ def process_boot_image_avb(image_to_process: Path) -> None:
     
     if not key_file:
         print(get_string("img_err_boot_key_mismatch").format(key=boot_pubkey))
-        raise KeyError(f"Unknown boot public key: {boot_pubkey}")
+        raise KeyError(get_string("img_err_boot_key_mismatch").format(key=boot_pubkey))
 
     print(get_string("img_key_matched").format(name=key_file.name))
     

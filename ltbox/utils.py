@@ -46,7 +46,7 @@ def get_platform_executable(name: str) -> Path:
     }
     exe_name = executables.get(system)
     if not exe_name:
-        raise RuntimeError(f"Unsupported operating system: {system}")
+        raise RuntimeError(get_string("err_unsupported_os").format(system=system))
     return const.DOWNLOAD_DIR / exe_name
 
 def _wait_for_resource(
@@ -128,7 +128,7 @@ def temporary_workspace(path: Path) -> Generator[Path, None, None]:
             try:
                 shutil.rmtree(path)
             except OSError as e:
-                print(f"Warning: Failed to clean up temporary workspace {path}: {e}", file=sys.stderr)
+                print(get_string("warn_failed_cleanup_workspace").format(path=path, e=e), file=sys.stderr)
 
 def clean_workspace() -> None:
     print(get_string('utils_cleaning_title'))

@@ -46,7 +46,7 @@ def decrypt_file(fi_path: str, fo_path: str) -> bool:
         with open(fo_path, "wb") as fo:
             fo.write(body)
             
-        print(get_string("img_decrypt_success"), original_size, "bytes")
+        print(get_string("img_decrypt_success"), original_size, get_string("img_decrypt_bytes"))
         return True
 
     except Exception as e:
