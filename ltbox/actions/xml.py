@@ -140,20 +140,19 @@ def _modify_xml_algo(wipe: int = 0) -> None:
                 raise FileNotFoundError(f"Critical XML file missing: {rawprogram_save.name} or fallbacks")
 
     try:
-        with open(rawprogram_save, 'r', encoding='utf-8') as f:
-            content = f.read()
+        tree = ET.parse(rawprogram_save)
+        root = tree.getroot()
         
         if wipe == 0:
             print(get_string("img_xml_nowipe"))
-            for i in range(1, 11):
-                content = content.replace(f'filename="metadata_{i}.img"', '')
-            for i in range(1, 21):
-                content = content.replace(f'filename="userdata_{i}.img"', '')
+            for prog in root.findall('program'):
+                label = prog.get('label', '').lower()
+                if label.startswith('metadata') or label.startswith('userdata'):
+                    prog.set('filename', '')
         else:
             print(get_string("img_xml_wipe"))
             
-        with open(rawprogram_save, 'w', encoding='utf-8') as f:
-            f.write(content)
+        tree.write(rawprogram_save, encoding='utf-8', xml_declaration=True)
         print(get_string("img_xml_patch_ok"))
     except Exception as e:
         print(get_string("img_xml_patch_err").format(e=e), file=sys.stderr)
