@@ -2,11 +2,11 @@ import json
 import sys
 from pathlib import Path
 
-BASE_DIR = Path(__file__).parent.parent.resolve()
-LTBOX_DIR = BASE_DIR / "ltbox"
-TOOLS_DIR = BASE_DIR / "tools"
+BASE_DIR = Path(__file__).parent.parent.parent.resolve()
+LTBOX_DIR = BASE_DIR / "bin" / "ltbox"
+TOOLS_DIR = BASE_DIR / "bin" / "tools"
 DOWNLOAD_DIR = TOOLS_DIR / "dl"
-PYTHON_DIR = BASE_DIR / "python3"
+PYTHON_DIR = BASE_DIR / "bin" / "python3"
 
 CONFIG_FILE = LTBOX_DIR / "config.json"
 _config = {}

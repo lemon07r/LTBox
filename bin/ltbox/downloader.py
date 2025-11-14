@@ -293,7 +293,7 @@ if __name__ == "__main__":
         const.DOWNLOAD_DIR.mkdir(exist_ok=True)
         try:
             print(get_string("utils_check_deps"))
-            req_path = const.BASE_DIR / "requirements.txt"
+            req_path = const.BASE_DIR / "bin" / "requirements.txt"
             subprocess.run(
                 [str(const.PYTHON_EXE), "-m", "pip", "install", "-r", str(req_path)],
                 check=True
