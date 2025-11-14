@@ -61,84 +61,138 @@ def patch_all(dev: device.DeviceController, wipe: int = 0) -> None:
     skip_dp_workflow = False
     
     try:
-        print("\n" + "="*61)
-        print(get_string('wf_step4_convert'))
-        print("="*61)
-        actions.convert_images(dev=dev, device_model=device_model)
-        print(get_string('wf_step4_complete'))
-
-        print("\n" + "="*61)
-        print(get_string('wf_step5_modify_xml'))
-        print("="*61)
-        actions.decrypt_x_files()
-        actions.modify_xml(wipe=wipe)
-        print(get_string('wf_step5_complete'))
-        
-        print("\n" + "="*61)
-        print(get_string('wf_step6_dump'))
-        print("="*61)
-
-        suffix = active_slot_suffix if active_slot_suffix else ""
-        boot_target = f"boot{suffix}"
-        vbmeta_target = f"vbmeta_system{suffix}"
-        
-        extra_dumps = [boot_target, vbmeta_target]
-        
-        print(get_string('wf_step6_extra_dumps').format(dumps=', '.join(extra_dumps)))
-        
-        dump_status = actions.read_edl(
-            dev=dev,
-            skip_reset=False, 
-            additional_targets=extra_dumps
-        )
-
-        if dump_status == "SKIP_DP":
-            skip_dp_workflow = True
-            print(get_string('wf_skip_dp'))
-        print(get_string('wf_step6_complete'))
-        
-        
-        if not skip_dp_workflow:
+        step_title_key = 'wf_step4_convert'
+        try:
             print("\n" + "="*61)
-            print(get_string('wf_step7_patch_dp'))
+            print(get_string(step_title_key))
             print("="*61)
-            actions.edit_devinfo_persist()
-            print(get_string('wf_step7_complete'))
-        else:
+            actions.convert_images(dev=dev, device_model=device_model)
+            print(get_string('wf_step4_complete'))
+        except (subprocess.CalledProcessError, FileNotFoundError, RuntimeError, KeyError) as e:
+            print("\n" + "!" * 61, file=sys.stderr)
+            print(get_string('wf_err_halted'), file=sys.stderr)
+            print(f"  [!] {get_string(step_title_key)} - FAILED", file=sys.stderr)
+            print(get_string('wf_err_details').format(e=e), file=sys.stderr)
+            print("!" * 61, file=sys.stderr)
+            raise
+
+        step_title_key = 'wf_step5_modify_xml'
+        try:
             print("\n" + "="*61)
-            print(get_string('wf_step7_skipped'))
+            print(get_string(step_title_key))
+            print("="*61)
+            actions.decrypt_x_files()
+            actions.modify_xml(wipe=wipe)
+            print(get_string('wf_step5_complete'))
+        except (subprocess.CalledProcessError, FileNotFoundError, RuntimeError, KeyError) as e:
+            print("\n" + "!" * 61, file=sys.stderr)
+            print(get_string('wf_err_halted'), file=sys.stderr)
+            print(f"  [!] {get_string(step_title_key)} - FAILED", file=sys.stderr)
+            print(get_string('wf_err_details').format(e=e), file=sys.stderr)
+            print("!" * 61, file=sys.stderr)
+            raise
+        
+        step_title_key = 'wf_step6_dump'
+        try:
+            print("\n" + "="*61)
+            print(get_string(step_title_key))
             print("="*61)
 
-        
-        print("\n" + "="*61)
-        print(get_string('wf_step8_check_arb'))
-        print("="*61)
-        
-        print(get_string('wf_step8_use_dumps'))
-        dumped_boot = const.BACKUP_DIR / f"{boot_target}.img"
-        dumped_vbmeta = const.BACKUP_DIR / f"{vbmeta_target}.img"
-        
-        arb_status_result = actions.read_anti_rollback(
-            dumped_boot_path=dumped_boot,
-            dumped_vbmeta_path=dumped_vbmeta
-        )
-        
-        if arb_status_result[0] == 'ERROR':
-            print("\n" + "!"*61)
-            print(get_string('wf_step8_err_arb_check'))
-            print(get_string('wf_step8_err_arb_check_detail'))
-            print(get_string('wf_step8_err_arb_abort'))
-            print("!"*61)
-            raise RuntimeError(get_string('wf_step8_err_arb_abort'))
+            suffix = active_slot_suffix if active_slot_suffix else ""
+            boot_target = f"boot{suffix}"
+            vbmeta_target = f"vbmeta_system{suffix}"
+            
+            extra_dumps = [boot_target, vbmeta_target]
+            
+            print(get_string('wf_step6_extra_dumps').format(dumps=', '.join(extra_dumps)))
+            
+            dump_status = actions.read_edl(
+                dev=dev,
+                skip_reset=False, 
+                additional_targets=extra_dumps
+            )
 
-        actions.patch_anti_rollback(comparison_result=arb_status_result)
-        print(get_string('wf_step8_complete'))
+            if dump_status == "SKIP_DP":
+                skip_dp_workflow = True
+                print(get_string('wf_skip_dp'))
+            print(get_string('wf_step6_complete'))
+        except (subprocess.CalledProcessError, FileNotFoundError, RuntimeError, KeyError) as e:
+            print("\n" + "!" * 61, file=sys.stderr)
+            print(get_string('wf_err_halted'), file=sys.stderr)
+            print(f"  [!] {get_string(step_title_key)} - FAILED", file=sys.stderr)
+            print(get_string('wf_err_details').format(e=e), file=sys.stderr)
+            print("!" * 61, file=sys.stderr)
+            raise
         
-        print("\n" + "="*61)
-        print(get_string('wf_step9_flash'))
-        print("="*61)
-        print(get_string('wf_step9_flash_info'))
-        actions.flash_edl(dev=dev, skip_reset_edl=True, skip_dp=skip_dp_workflow) 
+        
+        step_title_key = 'wf_step7_patch_dp'
+        try:
+            if not skip_dp_workflow:
+                print("\n" + "="*61)
+                print(get_string(step_title_key))
+                print("="*61)
+                actions.edit_devinfo_persist()
+                print(get_string('wf_step7_complete'))
+            else:
+                print("\n" + "="*61)
+                print(get_string('wf_step7_skipped'))
+                print("="*61)
+        except (subprocess.CalledProcessError, FileNotFoundError, RuntimeError, KeyError) as e:
+            print("\n" + "!" * 61, file=sys.stderr)
+            print(get_string('wf_err_halted'), file=sys.stderr)
+            print(f"  [!] {get_string(step_title_key)} - FAILED", file=sys.stderr)
+            print(get_string('wf_err_details').format(e=e), file=sys.stderr)
+            print("!" * 61, file=sys.stderr)
+            raise
+
+        
+        step_title_key = 'wf_step8_check_arb'
+        try:
+            print("\n" + "="*61)
+            print(get_string(step_title_key))
+            print("="*61)
+            
+            print(get_string('wf_step8_use_dumps'))
+            dumped_boot = const.BACKUP_DIR / f"{boot_target}.img"
+            dumped_vbmeta = const.BACKUP_DIR / f"{vbmeta_target}.img"
+            
+            arb_status_result = actions.read_anti_rollback(
+                dumped_boot_path=dumped_boot,
+                dumped_vbmeta_path=dumped_vbmeta
+            )
+            
+            if arb_status_result[0] == 'ERROR':
+                print("\n" + "!"*61)
+                print(get_string('wf_step8_err_arb_check'))
+                print(get_string('wf_step8_err_arb_check_detail'))
+                print(get_string('wf_step8_err_arb_abort'))
+                print("!"*61)
+                raise RuntimeError(get_string('wf_step8_err_arb_abort'))
+
+            actions.patch_anti_rollback(comparison_result=arb_status_result)
+            print(get_string('wf_step8_complete'))
+        except (subprocess.CalledProcessError, FileNotFoundError, RuntimeError, KeyError) as e:
+            print("\n" + "!" * 61, file=sys.stderr)
+            print(get_string('wf_err_halted'), file=sys.stderr)
+            print(f"  [!] {get_string(step_title_key)} - FAILED", file=sys.stderr)
+            print(get_string('wf_err_details').format(e=e), file=sys.stderr)
+            print("!" * 61, file=sys.stderr)
+            raise
+        
+        step_title_key = 'wf_step9_flash'
+        try:
+            print("\n" + "="*61)
+            print(get_string(step_title_key))
+            print("="*61)
+            print(get_string('wf_step9_flash_info'))
+            actions.flash_edl(dev=dev, skip_reset_edl=True, skip_dp=skip_dp_workflow)
+        except (subprocess.CalledProcessError, FileNotFoundError, RuntimeError, KeyError) as e:
+            print("\n" + "!" * 61, file=sys.stderr)
+            print(get_string('wf_err_halted'), file=sys.stderr)
+            print(f"  [!] {get_string(step_title_key)} - FAILED", file=sys.stderr)
+            print(get_string('wf_err_details').format(e=e), file=sys.stderr)
+            print("!" * 61, file=sys.stderr)
+            raise
         
         print("\n" + "=" * 61)
         print(get_string('wf_process_complete'))
