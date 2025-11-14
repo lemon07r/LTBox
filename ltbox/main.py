@@ -17,10 +17,13 @@ PYTHON_EXE = BASE_DIR / "python3" / "python.exe"
 DOWNLOADER_PY = APP_DIR / "downloader.py"
 
 try:
-    from .downloader import ToolError
+    from .errors import ToolError
 except ImportError:
-    class ToolError(Exception):
-        pass
+    print(f"[!] Critical Import Error: Failed to import 'ltbox.errors'.", file=sys.stderr)
+    print(f"[!] Please ensure 'ltbox/errors.py' file exists.", file=sys.stderr)
+    if platform.system() == "Windows":
+        os.system("pause")
+    sys.exit(1)
 
 def setup_console():
     system = platform.system()

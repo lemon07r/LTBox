@@ -9,7 +9,8 @@ from typing import Optional, Dict
 
 from .. import constants as const
 from .. import utils, device, downloader
-from ..downloader import ensure_magiskboot, ToolError
+from ..downloader import ensure_magiskboot
+from ..errors import ToolError
 from ..partition import ensure_params_or_fail
 from .system import detect_active_slot_robust
 from ..patch.root import patch_boot_with_root_algo

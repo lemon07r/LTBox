@@ -15,9 +15,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.resolve()))
 from ltbox import constants as const
 from ltbox import utils
 from ltbox.i18n import get_string, load_lang as i18n_load_lang
-
-class ToolError(Exception):
-    pass
+from ltbox.errors import ToolError
 
 def download_resource(url: str, dest_path: Path) -> None:
     import requests
