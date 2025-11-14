@@ -10,6 +10,7 @@ def detect_active_slot_robust(dev: device.DeviceController) -> Optional[str]:
 
     if not dev.skip_adb:
         try:
+            print(get_string("device_get_slot_adb"))
             active_slot = dev.get_active_slot_suffix()
         except Exception:
             pass
@@ -20,7 +21,9 @@ def detect_active_slot_robust(dev: device.DeviceController) -> Optional[str]:
         if not dev.skip_adb:
             print(get_string("act_reboot_bootloader"))
             try:
+                print(get_string("device_reboot_fastboot_adb"))
                 dev.reboot_to_bootloader()
+                print(get_string("device_reboot_fastboot_sent"))
             except Exception as e:
                 print(get_string("act_err_reboot_bl").format(e=e))
         else:
@@ -29,11 +32,14 @@ def detect_active_slot_robust(dev: device.DeviceController) -> Optional[str]:
             print("="*60 + "\n")
 
         dev.wait_for_fastboot()
+        print(get_string("device_get_slot_fastboot"))
         active_slot = dev.get_active_slot_suffix_from_fastboot()
 
         if not dev.skip_adb:
             print(get_string("act_slot_detected_sys"))
+            print(get_string("device_reboot_sys_fastboot"))
             dev.fastboot_reboot_system()
+            print(get_string("device_reboot_sent"))
             print(get_string("act_wait_adb"))
             dev.wait_for_adb()
         else:

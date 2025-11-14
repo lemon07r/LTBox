@@ -6,6 +6,7 @@ import sys
 import json
 from pathlib import Path
 from datetime import datetime
+from typing import List, Tuple
 
 from . import i18n
 from .logger import logging_context
@@ -284,6 +285,48 @@ def main_loop(device_controller_class, command_map):
             else:
                 input(get_string("press_enter_to_continue"))
 
+def prompt_for_language() -> str:
+    i18n.load_lang("en")
+    
+    try:
+        available_languages = i18n.get_available_languages()
+    except RuntimeError as e:
+        if "Language directory not found" in str(e):
+            print(get_string("err_lang_dir_not_found"), file=sys.stderr)
+            print(get_string("err_lang_dir_expected").format(path=i18n.LANG_DIR), file=sys.stderr)
+        elif "No language files" in str(e):
+            print(get_string("err_no_lang_files"), file=sys.stderr)
+            print(get_string("err_no_lang_files_path").format(path=i18n.LANG_DIR), file=sys.stderr)
+        else:
+            print(f"Error: {e}", file=sys.stderr)
+        
+        if platform.system() == "Windows":
+            os.system("pause")
+        raise e
+
+    menu_options = []
+    lang_map = {}
+    
+    for i, (lang_code, lang_name) in enumerate(available_languages, 1):
+        lang_map[str(i)] = lang_code
+        menu_options.append(f"     {i}. {lang_name}")
+
+    os.system('cls' if os.name == 'nt' else 'clear')
+    print("\n  " + "=" * 58)
+    print(get_string("menu_lang_title"))
+    print("  " + "=" * 58 + "\n")
+    print("\n".join(menu_options))
+    print("\n  " + "=" * 58 + "\n")
+
+    choice = ""
+    while choice not in lang_map:
+        prompt = get_string("menu_lang_prompt").format(len=len(lang_map))
+        choice = input(prompt).strip()
+        if choice not in lang_map:
+            print(get_string("menu_lang_invalid").format(len=len(lang_map)))
+    
+    return lang_map[choice]
+
 def entry_point():
     try:
         setup_console()
@@ -293,7 +336,7 @@ def entry_point():
         if is_info_mode:
             lang_code = "en"
         else:
-            lang_code = i18n.select_language()
+            lang_code = prompt_for_language()
             
         i18n.load_lang(lang_code)
         

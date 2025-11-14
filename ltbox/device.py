@@ -34,16 +34,12 @@ class DeviceController:
     def get_device_model(self) -> Optional[str]:
         self.wait_for_adb()
         if self.skip_adb:
-            print(get_string("device_skip_model_check"))
             return None
-        print(get_string("device_get_model_adb"))
         try:
             result = utils.run_command([str(const.ADB_EXE), "shell", "getprop", "ro.product.model"], capture=True)
             model = result.stdout.strip()
             if not model:
-                print(get_string("device_err_model_auth"))
                 return None
-            print(get_string("device_found_model").format(model=model))
             return model
         except Exception as e:
             print(get_string("device_err_get_model").format(e=e), file=sys.stderr)
@@ -53,16 +49,12 @@ class DeviceController:
     def get_active_slot_suffix(self) -> Optional[str]:
         self.wait_for_adb()
         if self.skip_adb:
-            print(get_string("device_skip_slot"))
             return None
-        print(get_string("device_get_slot_adb"))
         try:
             result = utils.run_command([str(const.ADB_EXE), "shell", "getprop", "ro.boot.slot_suffix"], capture=True)
             suffix = result.stdout.strip()
             if suffix not in ["_a", "_b"]:
-                print(get_string("device_warn_slot_invalid").format(suffix=suffix))
                 return None
-            print(get_string("device_found_slot").format(suffix=suffix))
             return suffix
         except Exception as e:
             print(get_string("device_err_get_slot").format(e=e), file=sys.stderr)
@@ -70,7 +62,6 @@ class DeviceController:
             return None
 
     def get_active_slot_suffix_from_fastboot(self) -> Optional[str]:
-        print(get_string("device_get_slot_fastboot"))
         try:
             result = utils.run_command([str(const.FASTBOOT_EXE), "getvar", "current-slot"], capture=True, check=False)
             output = result.stderr.strip() + "\n" + result.stdout.strip()
@@ -80,7 +71,6 @@ class DeviceController:
                 slot = match.group(1).strip()
                 if slot in ['a', 'b']:
                     suffix = f"_{slot}"
-                    print(get_string("device_found_slot_fastboot").format(suffix=suffix))
                     return suffix
             
             print(get_string("device_warn_slot_fastboot").format(snippet=output.splitlines()[0] if output else 'None'))
@@ -94,10 +84,8 @@ class DeviceController:
         if self.skip_adb:
             print(get_string("device_manual_edl_req"))
             return
-        print(get_string("device_reboot_edl_adb"))
         try:
             utils.run_command([str(const.ADB_EXE), "reboot", "edl"])
-            print(get_string("device_reboot_edl_sent"))
         except Exception as e:
             print(get_string("device_err_reboot").format(e=e), file=sys.stderr)
             print(get_string("device_manual_edl_fail"))
@@ -105,12 +93,9 @@ class DeviceController:
     def reboot_to_bootloader(self) -> None:
         self.wait_for_adb()
         if self.skip_adb:
-            print(get_string("device_skip_adb"))
             return
-        print(get_string("device_reboot_fastboot_adb"))
         try:
             utils.run_command([str(const.ADB_EXE), "reboot", "bootloader"])
-            print(get_string("device_reboot_fastboot_sent"))
         except Exception as e:
             print(get_string("device_err_reboot").format(e=e), file=sys.stderr)
             raise
@@ -154,10 +139,8 @@ class DeviceController:
         return True
 
     def fastboot_reboot_system(self) -> None:
-        print(get_string("device_reboot_sys_fastboot"))
         try:
             utils.run_command([str(const.FASTBOOT_EXE), "reboot"])
-            print(get_string("device_reboot_sent"))
         except Exception as e:
             print(get_string("device_err_reboot").format(e=e), file=sys.stderr)
             
@@ -277,7 +260,6 @@ class DeviceController:
             raise FileNotFoundError(get_string("device_err_qsahara_missing").format(path=const.QSAHARASERVER_EXE))
             
         port_str = f"\\\\.\\{port}"
-        print(get_string("device_upload_programmer").format(port=port))
         
         cmd_sahara = [
             str(const.QSAHARASERVER_EXE),
@@ -296,6 +278,7 @@ class DeviceController:
             raise e
 
     def load_firehose_programmer_with_stability(self, loader_path: Path, port: str) -> None:
+        print(get_string("device_upload_programmer").format(port=port))
         self.load_firehose_programmer(loader_path, port)
         time.sleep(2)
 
@@ -331,8 +314,6 @@ class DeviceController:
             "--zlpawarehost=1"
         ]
         
-        print(get_string("device_dumping_part").format(lun=lun, start=start_sector, num=num_sectors))
-        
         try:
             utils.run_command(cmd_fh, cwd=dest_dir, check=True)
         except subprocess.CalledProcessError as e:
@@ -367,8 +348,6 @@ class DeviceController:
             "--zlpawarehost=1"
         ]
         
-        print(get_string("device_flashing_part").format(filename=filename, lun=lun, start=start_sector))
-
         try:
             utils.run_command(cmd_fh, cwd=work_dir, check=True)
             print(get_string("device_flash_success").format(filename=filename))
@@ -381,7 +360,6 @@ class DeviceController:
             raise FileNotFoundError(get_string("device_err_fh_missing").format(path=const.FH_LOADER_EXE))
             
         port_str = f"\\\\.\\{port}"
-        print(get_string("device_resetting").format(port=port))
         
         cmd_fh = [
             str(const.FH_LOADER_EXE),

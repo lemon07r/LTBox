@@ -41,11 +41,13 @@ def patch_all(dev: device.DeviceController, wipe: int = 0) -> None:
 
     if not dev.skip_adb:
         try:
+            print(get_string("device_get_model_adb"))
             device_model = dev.get_device_model()
             if not device_model:
+                print(get_string("device_err_model_auth"))
                 raise RuntimeError(get_string('wf_err_adb_model'))
             else:
-                print(get_string('wf_device_model').format(model=device_model))
+                print(get_string("device_found_model").format(model=device_model))
         except Exception as e:
              raise RuntimeError(get_string('wf_err_get_model').format(e=e))
 

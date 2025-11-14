@@ -38,6 +38,7 @@ def read_edl(dev: device.DeviceController, skip_reset: bool = False, additional_
             params = ensure_params_or_fail(target)
             print(get_string("act_found_dump_info").format(xml=params['source_xml'], lun=params['lun'], start=params['start_sector']))
             
+            print(get_string("device_dumping_part").format(lun=params['lun'], start=params['start_sector'], num=params['num_sectors']))
             dev.fh_loader_read_part(
                 port=port,
                 output_filename=str(out_file),
@@ -57,6 +58,7 @@ def read_edl(dev: device.DeviceController, skip_reset: bool = False, additional_
 
     if not skip_reset:
         print(get_string("act_reset_sys"))
+        print(get_string("device_resetting"))
         dev.fh_loader_reset(port)
         print(get_string("act_reset_sent"))
         print(get_string("act_wait_stability_long"))
@@ -98,6 +100,7 @@ def write_edl(dev: device.DeviceController, skip_reset: bool = False, skip_reset
             params = ensure_params_or_fail(target)
             print(get_string("act_found_boot_info").format(lun=params['lun'], start=params['start_sector']))
             
+            print(get_string("device_flashing_part").format(filename=image_path.name, lun=params['lun'], start=params['start_sector']))
             dev.fh_loader_write_part(
                 port=port,
                 image_path=image_path,
@@ -113,6 +116,7 @@ def write_edl(dev: device.DeviceController, skip_reset: bool = False, skip_reset
     if not skip_reset:
         print(get_string("act_reboot_device"))
         try:
+            print(get_string("device_resetting"))
             dev.fh_loader_reset(port)
         except Exception as e:
             print(get_string("act_warn_reboot").format(e=e))
@@ -137,6 +141,7 @@ def write_anti_rollback(dev: device.DeviceController, skip_reset: bool = False) 
     print(get_string("act_boot_fastboot"))
     dev.wait_for_fastboot()
 
+    print(get_string("device_get_slot_fastboot"))
     active_slot = dev.get_active_slot_suffix_from_fastboot()
     if active_slot:
         print(get_string("act_slot_confirmed").format(slot=active_slot))
@@ -160,6 +165,8 @@ def write_anti_rollback(dev: device.DeviceController, skip_reset: bool = False) 
         print(get_string("act_write_boot").format(target=target_boot))
         params_boot = ensure_params_or_fail(target_boot)
         print(get_string("act_found_boot_info").format(lun=params_boot['lun'], start=params_boot['start_sector']))
+        
+        print(get_string("device_flashing_part").format(filename=boot_img.name, lun=params_boot['lun'], start=params_boot['start_sector']))
         dev.fh_loader_write_part(
             port=port,
             image_path=boot_img,
@@ -171,6 +178,8 @@ def write_anti_rollback(dev: device.DeviceController, skip_reset: bool = False) 
         print(get_string("act_write_vbmeta").format(target=target_vbmeta))
         params_vbmeta = ensure_params_or_fail(target_vbmeta)
         print(get_string("act_found_vbmeta_info").format(lun=params_vbmeta['lun'], start=params_vbmeta['start_sector']))
+        
+        print(get_string("device_flashing_part").format(filename=vbmeta_img.name, lun=params_vbmeta['lun'], start=params_vbmeta['start_sector']))
         dev.fh_loader_write_part(
             port=port,
             image_path=vbmeta_img,
@@ -181,6 +190,7 @@ def write_anti_rollback(dev: device.DeviceController, skip_reset: bool = False) 
 
         if not skip_reset:
             print(get_string("act_arb_reset"))
+            print(get_string("device_resetting"))
             dev.fh_loader_reset(port)
             print(get_string("act_reset_sent"))
         else:
@@ -321,6 +331,7 @@ def flash_edl(dev: device.DeviceController, skip_reset: bool = False, skip_reset
             time.sleep(5)
             
             print(get_string("act_reset_sys"))
+            print(get_string("device_resetting"))
             dev.fh_loader_reset(port)
             print(get_string("act_reset_sent"))
         except (subprocess.CalledProcessError, FileNotFoundError, Exception) as e:
