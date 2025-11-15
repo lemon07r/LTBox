@@ -119,43 +119,38 @@ def _ensure_rawprogram_save_persist(output_dir: Path) -> Path:
             raise
     else:
         fallback_candidates = ["rawprogram_unsparse0.xml", "rawprogram0.xml"]
-        found_candidate = None
         
         for cand_name in fallback_candidates:
             cand_path = output_dir / cand_name
             if cand_path.exists():
-                found_candidate = cand_path
-                break
-        
-        if found_candidate:
-            print(get_string("img_xml_fallback_found").format(src=found_candidate.name, dst=rawprogram_save.name))
-            try:
-                tree = ET.parse(found_candidate)
-                root = tree.getroot()
-                
-                persist_found = False
-                for prog in root.findall('program'):
-                    if prog.get('label', '').lower() == 'persist':
-                        prog.set('filename', '')
-                        persist_found = True
-                
-                tree.write(rawprogram_save, encoding='utf-8', xml_declaration=True)
-                
-                if persist_found:
-                    print(get_string("img_xml_created_save_persist").format(name=rawprogram_save.name))
-                else:
-                    print(get_string("img_xml_warn_persist_missing").format(name=found_candidate.name))
-                
-                return rawprogram_save
+                print(get_string("img_xml_fallback_found").format(src=cand_path.name, dst=rawprogram_save.name))
+                try:
+                    tree = ET.parse(cand_path)
+                    root = tree.getroot()
+                    
+                    persist_found = False
+                    for prog in root.findall('program'):
+                        if prog.get('label', '').lower() == 'persist':
+                            prog.set('filename', '')
+                            persist_found = True
+                    
+                    tree.write(rawprogram_save, encoding='utf-8', xml_declaration=True)
+                    
+                    if persist_found:
+                        print(get_string("img_xml_created_save_persist").format(name=rawprogram_save.name))
+                    else:
+                        print(get_string("img_xml_warn_persist_missing").format(name=cand_path.name))
+                    
+                    return rawprogram_save
 
-            except Exception as e:
-                print(get_string("img_xml_err_process_fallback").format(name=found_candidate.name, e=e), file=sys.stderr)
-                raise
-        else:
-            msg = get_string("img_xml_critical_missing").format(f1=rawprogram_save.name, f2=rawprogram_fallback.name)
-            print(msg)
-            print(get_string("img_xml_abort_mod"))
-            raise FileNotFoundError(msg)
+                except Exception as e:
+                    print(get_string("img_xml_err_process_fallback").format(name=cand_path.name, e=e), file=sys.stderr)
+                    raise
+
+        msg = get_string("img_xml_critical_missing").format(f1=rawprogram_save.name, f2=rawprogram_fallback.name)
+        print(msg)
+        print(get_string("img_xml_abort_mod"))
+        raise FileNotFoundError(msg)
 
 def _patch_xml_for_wipe(xml_path: Path, wipe: int) -> None:
     try:
