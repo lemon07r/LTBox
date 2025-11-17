@@ -239,15 +239,12 @@ def process_boot_image_avb(image_to_process: Path, gki: bool = False) -> None:
             key_file=key_file
         )
     else:
-        if boot_info.get('algorithm', 'NONE') != 'NONE':
-            print(get_string("img_avb_warn_algo_override").format(name=bak_name, algo=boot_info.get('algorithm')))
-        
-        print(get_string("img_avb_apply_footer_none").format(name=image_to_process.name))
+        print(get_string("img_avb_apply_footer").format(name=image_to_process.name, algo=boot_info['algorithm']))
         
         add_footer_cmd = [
             str(const.PYTHON_EXE), str(const.AVBTOOL_PY), "add_hash_footer",
             "--image", str(image_to_process), 
-            "--algorithm", "NONE",
+            "--algorithm", boot_info['algorithm'],
             "--partition_size", boot_info['partition_size'],
             "--partition_name", boot_info['name'], 
             "--rollback_index", str(boot_info['rollback']),

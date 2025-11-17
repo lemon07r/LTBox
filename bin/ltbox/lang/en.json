@@ -743,5 +743,5 @@
   "img_avb_erase_footer_fail": "[*] Note: 'erase_footer' failed, likely because no footer was present. This is expected. ({e})",
   "img_avb_warn_key_fallback": "[!] Warning: Original key SHA1 '{key}' not in key_map. Falling back to '{fallback_name}'.",
   "img_avb_warn_algo_override": "[!] Warning: '{name}' algorithm is '{algo}', not 'NONE'. Overriding to NONE.",
-  "img_avb_apply_footer_none": "[*] Applying hash footer for '{name}' with Algorithm=NONE (no signing)..."
+  "img_avb_apply_footer": "[*] Applying hash footer for '{name}' with Algorithm={algo}..."
 }
