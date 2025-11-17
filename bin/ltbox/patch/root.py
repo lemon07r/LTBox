@@ -24,7 +24,7 @@ def patch_boot_with_root_algo(
     work_img_path = work_dir / img_name
 
     if not work_img_path.exists():
-        print(f"[!] Image '{img_name}' not found in working directory.", file=sys.stderr)
+        print(get_string("img_root_err_img_not_found").format(name=img_name), file=sys.stderr)
         return None
 
     if gki:
@@ -110,7 +110,6 @@ def patch_boot_with_root_algo(
         print(get_string("img_root_repack_ok"))
 
         return patched_boot_path
-
 
 def get_kernel_version(file_path: Union[str, Path]) -> Optional[str]:
     kernel_file = Path(file_path)

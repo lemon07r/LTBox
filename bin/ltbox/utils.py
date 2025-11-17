@@ -243,11 +243,11 @@ def _process_binary_file(
 
         if stats.get('changed', False):
             output_path.write_bytes(modified_content)
-            ui.echo(get_string("img_proc_success").format(msg=stats.get('message', 'Modifications applied.')))
+            ui.echo(get_string("img_proc_success").format(msg=stats.get('message', get_string('img_proc_msg_modified'))))
             ui.echo(get_string("img_proc_saved").format(name=output_path.name))
             return True
         else:
-            ui.echo(get_string("img_proc_no_change").format(name=input_path.name, msg=stats.get('message', 'No patterns found')))
+            ui.echo(get_string("img_proc_no_change").format(name=input_path.name, msg=stats.get('message', get_string('img_proc_msg_no_patterns'))))
             if copy_if_unchanged:
                 ui.echo(get_string("img_proc_copying").format(name=output_path.name))
                 if input_path != output_path:

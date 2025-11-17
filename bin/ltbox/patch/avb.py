@@ -193,7 +193,7 @@ def process_boot_image_avb(image_to_process: Path, gki: bool = False) -> None:
         print(get_string("img_err_boot_bak_missing").format(name=boot_bak_img.name), file=sys.stderr)
         raise FileNotFoundError(get_string("img_err_boot_bak_missing").format(name=boot_bak_img.name))
         
-    print(f"[*] Extracting AVB info from original '{boot_bak_img.name}'...")
+    print(get_string("img_avb_extract_info").format(name=boot_bak_img.name))
     boot_info = extract_image_avb_info(boot_bak_img)
     
     required_keys = ['partition_size', 'name', 'rollback', 'salt', 'algorithm']
@@ -208,15 +208,15 @@ def process_boot_image_avb(image_to_process: Path, gki: bool = False) -> None:
                 raise KeyError(get_string("img_err_missing_key").format(key=key, name=boot_bak_img.name))
 
     try:
-        print(f"[*] Erasing any existing footer from '{image_to_process.name}' (pre-signing step)...")
+        print(get_string("img_avb_erase_footer").format(name=image_to_process.name))
         utils.run_command(
             [str(const.PYTHON_EXE), str(const.AVBTOOL_PY), "erase_footer", "--image", str(image_to_process)],
             capture=True,
             check=False
         )
-        print(f"[*] Note: 'erase_footer' complete. Errors are ignored as image may not have a footer.")
+        print(get_string("img_avb_erase_footer_ok"))
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
-        print(f"[*] Note: 'erase_footer' failed, likely because no footer was present. This is expected. ({e})")
+        print(get_string("img_avb_erase_footer_fail").format(e=e))
             
     if gki:
         boot_pubkey = boot_info.get('pubkey_sha1')
@@ -229,7 +229,7 @@ def process_boot_image_avb(image_to_process: Path, gki: bool = False) -> None:
                 print(get_string("img_err_boot_key_mismatch").format(key=boot_pubkey))
                 raise KeyError(get_string("img_err_boot_key_mismatch").format(key=boot_pubkey))
             else:
-                print(f"[!] Warning: Original key SHA1 '{boot_pubkey}' not in key_map. Falling back to '{key_file.name}'.")
+                print(get_string("img_avb_warn_key_fallback").format(key=boot_pubkey, fallback_name=key_file.name))
 
         print(get_string("img_key_matched").format(name=key_file.name))
         
@@ -239,11 +239,10 @@ def process_boot_image_avb(image_to_process: Path, gki: bool = False) -> None:
             key_file=key_file
         )
     else:
-        # LKM Mode (init_boot)
         if boot_info.get('algorithm', 'NONE') != 'NONE':
-            print(f"[!] Warning: '{bak_name}' algorithm is '{boot_info.get('algorithm')}', not 'NONE'. Overriding to NONE.")
+            print(get_string("img_avb_warn_algo_override").format(name=bak_name, algo=boot_info.get('algorithm')))
         
-        print(f"[*] Applying hash footer for '{image_to_process.name}' with Algorithm=NONE (no signing)...")
+        print(get_string("img_avb_apply_footer_none").format(name=image_to_process.name))
         
         add_footer_cmd = [
             str(const.PYTHON_EXE), str(const.AVBTOOL_PY), "add_hash_footer",

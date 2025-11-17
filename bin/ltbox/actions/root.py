@@ -158,11 +158,10 @@ def root_boot_only(gki: bool = False) -> None:
         print(err_missing)
         raise ToolError(err_missing)
 
-    shutil.copy(boot_img, const.BASE_DIR / bak_name)
     print(get_string("act_backup_boot"))
+    shutil.copy(boot_img, const.BASE_DIR / bak_name)
     if not gki:
         shutil.copy(vbmeta_img, const.BASE_DIR / vbmeta_bak_name)
-        print(get_string("act_backup_boot"))
 
     patched_boot_path = None
     patched_vbmeta_path = None
@@ -241,7 +240,7 @@ def root_boot_only(gki: bool = False) -> None:
         print(get_string("act_success"))
         print(success_msg.format(dir=out_dir_name))
         if not gki:
-            print(f"  Patched {vbmeta_img_name} saved to '{out_dir_name}'.")
+            print(get_string("act_root_saved_vbmeta_lkm").format(name=vbmeta_img_name, dir=out_dir_name))
         print("=" * 61)
     else:
         print(fail_msg, file=sys.stderr)
@@ -279,11 +278,11 @@ def root_device(dev: device.DeviceController, gki: bool = False) -> None:
             try:
                 lkm_kernel_version = get_kernel_version_from_adb(dev)
             except Exception as e:
-                print(f"[!] Warning: Could not get kernel version via ADB: {e}", file=sys.stderr)
-                print("[!] Will attempt to get it later, but this may fail if device is rebooting.")
+                print(get_string("act_root_warn_lkm_kver_fail").format(e=e), file=sys.stderr)
+                print(get_string("act_root_warn_lkm_kver_retry"), file=sys.stderr)
         else:
-            print("[!] LKM root with 'Skip ADB' is not supported as it needs the kernel version.", file=sys.stderr)
-            raise ToolError("LKM root requires ADB to get kernel version.")
+            print(get_string("act_root_err_lkm_skip_adb"), file=sys.stderr)
+            raise ToolError(get_string("act_root_err_lkm_skip_adb_exc"))
 
     target_partition = ""
     target_vbmeta_partition = ""
@@ -369,11 +368,14 @@ def root_device(dev: device.DeviceController, gki: bool = False) -> None:
                     
                     if expected_size_bytes != actual_size_bytes:
                         raise RuntimeError(
-                            f"Dumped file size mismatch for '{target_partition}'. "
-                            f"Expected: {expected_size_bytes}B, Got: {actual_size_bytes}B"
+                            get_string("act_err_dump_mismatch").format(
+                                part=target_partition,
+                                expected=expected_size_bytes,
+                                actual=actual_size_bytes
+                            )
                         )
                 except (ValueError, OSError) as e:
-                    print(get_string("act_err_dump").format(part=target_partition, e=e), file=sys.stderr)
+                    print(get_string("act_err_dump").format(part=target_partition, e=f"Size validation error: {e}"), file=sys.stderr)
                     raise
             
             if gki:

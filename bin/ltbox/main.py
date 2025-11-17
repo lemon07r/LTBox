@@ -30,7 +30,7 @@ def setup_console():
     if system == "Windows":
         try:
             import ctypes
-            ctypes.windll.kernel32.SetConsoleTitleW(u"LTBox")
+            ctypes.windll.kernel32.SetConsoleTitleW(get_string("app_title"))
         except Exception as e:
             print(get_string("warn_set_console_title").format(e=e), file=sys.stderr)
 
@@ -116,7 +116,7 @@ def run_task(command, title, dev, command_map):
             print(get_string("press_any_key_to_return"))
 
         if platform.system() == "Windows":
-            os.system(f"pause > nul & echo {get_string('press_any_key')}...")
+            os.system(f"pause > nul & echo {get_string('press_any_key')}")
         else:
             input()
 
@@ -142,7 +142,7 @@ def run_info_scan(paths, constants, avb_patch):
 
     with logging_context(log_filename) as logger:
         for f in files_to_scan:
-            header = f"--- Info for: {f.resolve()} ---\n"
+            header = get_string("scan_log_header").format(path=f.resolve())
             logger.info(header)
             print(get_string("scan_scanning_file").format(filename=f.name))
             
@@ -160,7 +160,7 @@ def run_info_scan(paths, constants, avb_patch):
                 logger.info(result.stdout.strip())
                 
                 if result.stderr:
-                     logger.info(f"\n[Errors]\n{result.stderr.strip()}")
+                     logger.info(get_string("scan_log_errors").format(errors=result.stderr.strip()))
 
                 logger.info("\n" + "="*70 + "\n")
             except Exception as e:
@@ -358,7 +358,7 @@ def prompt_for_language() -> str:
             print(get_string("err_no_lang_files"), file=sys.stderr)
             print(get_string("err_no_lang_files_path").format(path=i18n.LANG_DIR), file=sys.stderr)
         else:
-            print(f"Error: {e}", file=sys.stderr)
+            print(get_string("err_lang_generic").format(e=e), file=sys.stderr)
         
         if platform.system() == "Windows":
             os.system("pause")
@@ -471,13 +471,13 @@ def entry_point():
             main_loop(device_controller_class, COMMAND_MAP)
 
     except (RuntimeError, ToolError) as e:
-        print(f"\n[!] A fatal error occurred. Aborting.", file=sys.stderr)
-        print(f"[!] Details: {e}", file=sys.stderr)
+        print(get_string("err_fatal_abort"), file=sys.stderr)
+        print(get_string("err_fatal_details").format(e=e), file=sys.stderr)
         if platform.system() == "Windows":
             os.system("pause")
         sys.exit(1)
     except KeyboardInterrupt:
-        print(f"\n[!] Process cancelled by user.", file=sys.stderr)
+        print(get_string("err_fatal_user_cancel"), file=sys.stderr)
         sys.exit(0)
 
 if __name__ == "__main__":

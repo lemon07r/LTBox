@@ -170,13 +170,13 @@ def patch_anti_rollback_in_rom() -> None:
 
     if not boot_files or not vbmeta_files:
         print(get_string("act_err_dumped_missing"), file=sys.stderr)
-        print("[!] Please run 'Detect Anti-Rollback from device' (Menu 5) first.", file=sys.stderr)
+        print(get_string("act_arb_run_detect_first"), file=sys.stderr)
         raise FileNotFoundError(get_string("act_err_dumped_missing"))
 
     dumped_boot = boot_files[0]
     dumped_vbmeta = vbmeta_files[0]
     
-    print(f"[*] Using dumped files: {dumped_boot.name}, {dumped_vbmeta.name}")
+    print(get_string("act_arb_using_dumped_files").format(boot=dumped_boot.name, vbmeta=dumped_vbmeta.name))
 
     comparison_result = read_anti_rollback(
         dumped_boot_path=dumped_boot,
