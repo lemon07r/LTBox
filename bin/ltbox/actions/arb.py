@@ -135,7 +135,8 @@ def read_anti_rollback_from_device(dev: device.DeviceController) -> None:
     edl.read_edl(
         dev=dev,
         skip_reset=False, 
-        additional_targets=[boot_target, vbmeta_target]
+        additional_targets=[boot_target, vbmeta_target],
+        default_targets=False
     )
     print(get_string('wf_step6_complete'))
 

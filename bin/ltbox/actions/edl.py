@@ -12,7 +12,7 @@ from .. import utils, device
 from ..partition import ensure_params_or_fail
 from ..i18n import get_string
 
-def read_edl(dev: device.DeviceController, skip_reset: bool = False, additional_targets: Optional[List[str]] = None) -> None:
+def read_edl(dev: device.DeviceController, skip_reset: bool = False, additional_targets: Optional[List[str]] = None, default_targets: bool = True) -> None:
     print(get_string("act_start_dump"))
     
     port = dev.setup_edl_connection()
@@ -24,7 +24,9 @@ def read_edl(dev: device.DeviceController, skip_reset: bool = False, additional_
 
     const.BACKUP_DIR.mkdir(exist_ok=True)
     
-    targets = ["devinfo", "persist"]
+    targets = []
+    if default_targets:
+        targets.extend(["devinfo", "persist"])
 
     if additional_targets:
         targets.extend(additional_targets)
@@ -65,7 +67,7 @@ def read_edl(dev: device.DeviceController, skip_reset: bool = False, additional_
         except (ValueError, FileNotFoundError) as e:
             print(get_string("act_skip_dump").format(target=target, e=e))
         except Exception as e:
-            print(get_string("act_err_dump").format(target=target, e=e), file=sys.stderr)
+            print(get_string("act_err_dump").format(part=target, e=e), file=sys.stderr)
 
         print(get_string("act_wait_stability"))
         time.sleep(5)
