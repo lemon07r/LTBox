@@ -331,27 +331,29 @@ def get_lkm_kernel(dev: "device.DeviceController", target_path: Path) -> None:
         
     kernel_version = _get_kernel_version_from_adb(dev)
     
-    asset_pattern = f"android14-{kernel_version}_kernelsu.ko"
-    print(get_string("dl_lkm_downloading").format(asset=asset_pattern))
+    asset_pattern_regex = f"android.*-{kernel_version}_kernelsu.ko"
+    print(get_string("dl_lkm_downloading").format(asset=f"*{kernel_version}_kernelsu.ko"))
     
     fetch_command = [
         "--repo", f"https://github.com/{const.KSU_APK_REPO}",
         "--tag", const.KSU_APK_TAG,
-        "--release-asset", asset_pattern,
+        "--release-asset", asset_pattern_regex,
         str(target_path.parent)
     ]
     
     try:
         _run_fetch_command(fetch_command)
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
-        print(get_string("dl_lkm_download_fail").format(asset=asset_pattern), file=sys.stderr)
+        print(get_string("dl_lkm_download_fail").format(asset=asset_pattern_regex), file=sys.stderr)
         print(f"[!] {e}", file=sys.stderr)
-        raise ToolError(get_string("dl_lkm_download_fail").format(asset=asset_pattern))
+        raise ToolError(get_string("dl_lkm_download_fail").format(asset=asset_pattern_regex))
     
-    downloaded_file = target_path.parent / asset_pattern
-    if not downloaded_file.exists():
-        raise ToolError(get_string("dl_lkm_download_fail").format(asset=asset_pattern))
+    downloaded_files = list(target_path.parent.glob(f"android*-{kernel_version}_kernelsu.ko"))
     
+    if not downloaded_files:
+        raise ToolError(get_string("dl_lkm_download_fail").format(asset=asset_pattern_regex))
+    
+    downloaded_file = downloaded_files[0]
     shutil.move(downloaded_file, target_path)
     print(get_string("dl_lkm_download_ok"))
 
