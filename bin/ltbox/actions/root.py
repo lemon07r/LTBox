@@ -263,6 +263,16 @@ def root_device(dev: device.DeviceController, gki: bool = False) -> None:
 
     utils.check_dependencies()
     
+    if not const.EDL_LOADER_FILE.exists():
+        print(get_string("act_err_loader_missing").format(name=const.EDL_LOADER_FILE.name, dir=const.IMAGE_DIR.name))
+        prompt = get_string("device_loader_prompt").format(loader=const.EDL_LOADER_FILENAME, folder=const.IMAGE_DIR.name)
+        utils.wait_for_files(const.IMAGE_DIR, [const.EDL_LOADER_FILENAME], prompt)
+
+    if not list(const.OUTPUT_XML_DIR.glob("rawprogram*.xml")) and not list(const.IMAGE_DIR.glob("rawprogram*.xml")) and not list(const.IMAGE_DIR.glob("*.x")):
+         print(get_string("act_err_no_xmls").format(dir=const.IMAGE_DIR.name))
+         prompt = get_string("act_prompt_image")
+         utils.wait_for_directory(const.IMAGE_DIR, prompt)
+
     magiskboot_exe = utils.get_platform_executable("magiskboot")
     ensure_magiskboot()
 

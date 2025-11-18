@@ -15,6 +15,16 @@ from ..i18n import get_string
 def read_edl(dev: device.DeviceController, skip_reset: bool = False, additional_targets: Optional[List[str]] = None, default_targets: bool = True) -> None:
     print(get_string("act_start_dump"))
     
+    if not const.EDL_LOADER_FILE.exists():
+        print(get_string("act_err_loader_missing").format(name=const.EDL_LOADER_FILE.name, dir=const.IMAGE_DIR.name))
+        prompt = get_string("device_loader_prompt").format(loader=const.EDL_LOADER_FILENAME, folder=const.IMAGE_DIR.name)
+        utils.wait_for_files(const.IMAGE_DIR, [const.EDL_LOADER_FILENAME], prompt)
+
+    if not list(const.OUTPUT_XML_DIR.glob("rawprogram*.xml")) and not list(const.IMAGE_DIR.glob("rawprogram*.xml")) and not list(const.IMAGE_DIR.glob("*.x")):
+         print(get_string("act_err_no_xmls").format(dir=const.IMAGE_DIR.name))
+         prompt = get_string("act_prompt_image")
+         utils.wait_for_directory(const.IMAGE_DIR, prompt)
+
     port = dev.setup_edl_connection()
     
     try:
@@ -97,6 +107,16 @@ def write_edl(dev: device.DeviceController, skip_reset: bool = False, skip_reset
         raise FileNotFoundError(get_string("act_err_dp_folder_nf").format(dir=const.OUTPUT_DP_DIR.name))
     print(get_string("act_found_dp_folder").format(dir=const.OUTPUT_DP_DIR.name))
 
+    if not const.EDL_LOADER_FILE.exists():
+        print(get_string("act_err_loader_missing").format(name=const.EDL_LOADER_FILE.name, dir=const.IMAGE_DIR.name))
+        prompt = get_string("device_loader_prompt").format(loader=const.EDL_LOADER_FILENAME, folder=const.IMAGE_DIR.name)
+        utils.wait_for_files(const.IMAGE_DIR, [const.EDL_LOADER_FILENAME], prompt)
+
+    if not list(const.OUTPUT_XML_DIR.glob("rawprogram*.xml")) and not list(const.IMAGE_DIR.glob("rawprogram*.xml")) and not list(const.IMAGE_DIR.glob("*.x")):
+         print(get_string("act_err_no_xmls").format(dir=const.IMAGE_DIR.name))
+         prompt = get_string("act_prompt_image")
+         utils.wait_for_directory(const.IMAGE_DIR, prompt)
+
     port = dev.setup_edl_connection()
 
     try:
@@ -155,6 +175,16 @@ def write_anti_rollback(dev: device.DeviceController, skip_reset: bool = False) 
         print(get_string("act_err_run_patch_arb"), file=sys.stderr)
         raise FileNotFoundError(get_string("act_err_patched_missing_exc").format(dir=const.OUTPUT_ANTI_ROLLBACK_DIR.name))
     print(get_string("act_found_arb_folder").format(dir=const.OUTPUT_ANTI_ROLLBACK_DIR.name))
+    
+    if not const.EDL_LOADER_FILE.exists():
+        print(get_string("act_err_loader_missing").format(name=const.EDL_LOADER_FILE.name, dir=const.IMAGE_DIR.name))
+        prompt = get_string("device_loader_prompt").format(loader=const.EDL_LOADER_FILENAME, folder=const.IMAGE_DIR.name)
+        utils.wait_for_files(const.IMAGE_DIR, [const.EDL_LOADER_FILENAME], prompt)
+
+    if not list(const.OUTPUT_XML_DIR.glob("rawprogram*.xml")) and not list(const.IMAGE_DIR.glob("rawprogram*.xml")) and not list(const.IMAGE_DIR.glob("*.x")):
+         print(get_string("act_err_no_xmls").format(dir=const.IMAGE_DIR.name))
+         prompt = get_string("act_prompt_image")
+         utils.wait_for_directory(const.IMAGE_DIR, prompt)
     
     print(get_string("act_arb_write_step1"))
     print(get_string("act_boot_fastboot"))
