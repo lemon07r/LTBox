@@ -6,7 +6,6 @@ from typing import Dict, Optional, Any, Tuple, Union
 
 from .. import constants as const
 from .. import utils
-from .. import constants as const
 from ..i18n import get_string
 
 def _patch_vendor_boot_logic(content: bytes, **kwargs: Any) -> Tuple[bytes, Dict[str, Any]]:
