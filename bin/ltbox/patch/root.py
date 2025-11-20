@@ -16,8 +16,8 @@ def patch_boot_with_root_algo(
     lkm_kernel_version: Optional[str] = None
 ) -> Optional[Path]:
     
-    img_name = "boot.img" if gki else "init_boot.img"
-    out_img_name = "boot.root.img" if gki else "init_boot.root.img"
+    img_name = const.FN_BOOT if gki else const.FN_INIT_BOOT
+    out_img_name = const.FN_BOOT_ROOT if gki else const.FN_INIT_BOOT_ROOT
     
     patched_boot_path = const.BASE_DIR / out_img_name
     work_img_path = work_dir / img_name

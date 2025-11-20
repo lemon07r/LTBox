@@ -1,6 +1,7 @@
 import json
 import sys
 from pathlib import Path
+from typing import Any
 
 BASE_DIR = Path(__file__).parent.parent.parent.resolve()
 LTBOX_DIR = BASE_DIR / "bin" / "ltbox"
@@ -9,9 +10,29 @@ DOWNLOAD_DIR = TOOLS_DIR / "dl"
 PYTHON_DIR = BASE_DIR / "bin" / "python3"
 
 CONFIG_FILE = LTBOX_DIR / "config.json"
+
+FN_BOOT = "boot.img"
+FN_INIT_BOOT = "init_boot.img"
+FN_VENDOR_BOOT = "vendor_boot.img"
+FN_VBMETA = "vbmeta.img"
+FN_VBMETA_SYSTEM = "vbmeta_system.img"
+FN_DEVINFO = "devinfo.img"
+FN_PERSIST = "persist.img"
+
+FN_BOOT_BAK = "boot.bak.img"
+FN_INIT_BOOT_BAK = "init_boot.bak.img"
+FN_VBMETA_BAK = "vbmeta.bak.img"
+FN_VENDOR_BOOT_BAK = "vendor_boot.bak.img"
+
+FN_BOOT_ROOT = "boot.root.img"
+FN_INIT_BOOT_ROOT = "init_boot.root.img"
+FN_VBMETA_ROOT = "vbmeta.root.img"
+
+FN_VENDOR_BOOT_PRC = "vendor_boot_prc.img"
+
 _config = {}
 
-def load_config():
+def load_config() -> None:
     global _config
     if CONFIG_FILE.exists():
         try:
@@ -22,12 +43,14 @@ def load_config():
     else:
         raise RuntimeError(f"[!] Critical Error: Configuration file missing: {CONFIG_FILE}")
 
-def _get_cfg(section: str, key: str) -> str:
+def _get_cfg(section: str, key: str, default: Any = None) -> Any:
     if not _config:
         load_config()
     try:
         return _config[section][key]
     except KeyError:
+        if default is not None:
+            return default
         raise RuntimeError(f"[!] Critical Error: Missing configuration key: [{section}][{key}]")
 
 OUTPUT_DIR = BASE_DIR / "output"
@@ -82,7 +105,7 @@ def _build_key_map() -> dict[str, Path]:
     if not _config:
         load_config()
     try:
-        cfg_map = _config["key_map"]
+        cfg_map = _config.get("key_map", {})
         return {key: DOWNLOAD_DIR / filename for key, filename in cfg_map.items()}
     except KeyError:
          raise RuntimeError(f"[!] Critical Error: Missing configuration section: [key_map]")

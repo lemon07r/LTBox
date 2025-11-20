@@ -88,13 +88,13 @@ def _patch_lkm_via_app(
         return None
 
 def root_boot_only(gki: bool = False) -> None:
-    img_name = "boot.img" if gki else "init_boot.img"
-    bak_name = "boot.bak.img" if gki else "init_boot.bak.img"
+    img_name = const.FN_BOOT if gki else const.FN_INIT_BOOT
+    bak_name = const.FN_BOOT_BAK if gki else const.FN_INIT_BOOT_BAK
     out_dir = const.OUTPUT_ROOT_DIR if gki else const.OUTPUT_ROOT_LKM_DIR
     out_dir_name = const.OUTPUT_ROOT_DIR.name if gki else const.OUTPUT_ROOT_LKM_DIR.name
     
-    vbmeta_img_name = "vbmeta.img"
-    vbmeta_bak_name = "vbmeta.bak.img"
+    vbmeta_img_name = const.FN_VBMETA
+    vbmeta_bak_name = const.FN_VBMETA_BAK
 
     if gki:
         wait_prompt_key = "act_prompt_boot"
@@ -205,7 +205,7 @@ def root_boot_only(gki: bool = False) -> None:
             print(get_string("act_key_matched").format(name=key_file.name))
             
             print(get_string("act_remaking_vbmeta"))
-            patched_vbmeta_path = const.BASE_DIR / "vbmeta.root.img"
+            patched_vbmeta_path = const.BASE_DIR / const.FN_VBMETA_ROOT
             remake_cmd = [
                 str(const.PYTHON_EXE), str(const.AVBTOOL_PY), "make_vbmeta_image",
                 "--output", str(patched_vbmeta_path),
@@ -243,13 +243,13 @@ def root_boot_only(gki: bool = False) -> None:
 def root_device(dev: device.DeviceController, gki: bool = False) -> None:
     print(get_string("act_start_root"))
     
-    img_name = "boot.img" if gki else "init_boot.img"
-    bak_name = "boot.bak.img" if gki else "init_boot.bak.img"
+    img_name = const.FN_BOOT if gki else const.FN_INIT_BOOT
+    bak_name = const.FN_BOOT_BAK if gki else const.FN_INIT_BOOT_BAK
     out_dir = const.OUTPUT_ROOT_DIR if gki else const.OUTPUT_ROOT_LKM_DIR
     bak_dir = const.BACKUP_BOOT_DIR if gki else const.BACKUP_INIT_BOOT_DIR
     
-    vbmeta_img_name = "vbmeta.img"
-    vbmeta_bak_name = "vbmeta.bak.img"
+    vbmeta_img_name = const.FN_VBMETA
+    vbmeta_bak_name = const.FN_VBMETA_BAK
     
     if out_dir.exists():
         shutil.rmtree(out_dir)
@@ -445,7 +445,7 @@ def root_device(dev: device.DeviceController, gki: bool = False) -> None:
             print(get_string("act_key_matched").format(name=key_file.name))
             
             print(get_string("act_remaking_vbmeta"))
-            patched_vbmeta_path = const.BASE_DIR / "vbmeta.root.img"
+            patched_vbmeta_path = const.BASE_DIR / const.FN_VBMETA_ROOT
             remake_cmd = [
                 str(const.PYTHON_EXE), str(const.AVBTOOL_PY), "make_vbmeta_image",
                 "--output", str(patched_vbmeta_path),
@@ -528,9 +528,9 @@ def unroot_device(dev: device.DeviceController) -> None:
     gki_bak_dir = const.BACKUP_BOOT_DIR
     lkm_bak_dir = const.BACKUP_INIT_BOOT_DIR
     
-    gki_boot_file = gki_bak_dir / "boot.img"
-    lkm_init_boot_file = lkm_bak_dir / "init_boot.img"
-    lkm_vbmeta_file = lkm_bak_dir / "vbmeta.img"
+    gki_boot_file = gki_bak_dir / const.FN_BOOT
+    lkm_init_boot_file = lkm_bak_dir / const.FN_INIT_BOOT
+    lkm_vbmeta_file = lkm_bak_dir / const.FN_VBMETA
     
     gki_bak_dir.mkdir(exist_ok=True)
     lkm_bak_dir.mkdir(exist_ok=True)

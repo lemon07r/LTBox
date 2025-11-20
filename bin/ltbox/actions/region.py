@@ -24,16 +24,16 @@ def convert_images(dev: device.DeviceController, device_model: Optional[str] = N
 
     print(get_string("act_wait_vb_vbmeta"))
     const.IMAGE_DIR.mkdir(exist_ok=True)
-    required_files = ["vendor_boot.img", "vbmeta.img"]
+    required_files = [const.FN_VENDOR_BOOT, const.FN_VBMETA]
     prompt = get_string("act_prompt_vb_vbmeta").format(name=const.IMAGE_DIR.name)
     utils.wait_for_files(const.IMAGE_DIR, required_files, prompt)
     
-    vendor_boot_src = const.IMAGE_DIR / "vendor_boot.img"
-    vbmeta_src = const.IMAGE_DIR / "vbmeta.img"
+    vendor_boot_src = const.IMAGE_DIR / const.FN_VENDOR_BOOT
+    vbmeta_src = const.IMAGE_DIR / const.FN_VBMETA
 
     print(get_string("act_backup_orig"))
-    vendor_boot_bak = const.BASE_DIR / "vendor_boot.bak.img"
-    vbmeta_bak = const.BASE_DIR / "vbmeta.bak.img"
+    vendor_boot_bak = const.BASE_DIR / const.FN_VENDOR_BOOT_BAK
+    vbmeta_bak = const.BASE_DIR / const.FN_VBMETA_BAK
     
     try:
         shutil.copy(vendor_boot_src, vendor_boot_bak)
@@ -46,7 +46,7 @@ def convert_images(dev: device.DeviceController, device_model: Optional[str] = N
     print(get_string("act_start_conv"))
     edit_vendor_boot(str(vendor_boot_bak))
 
-    vendor_boot_prc = const.BASE_DIR / "vendor_boot_prc.img"
+    vendor_boot_prc = const.BASE_DIR / const.FN_VENDOR_BOOT_PRC
     print(get_string("act_verify_conv"))
     if not vendor_boot_prc.exists():
         print(get_string("act_err_vb_prc_missing"))
@@ -113,7 +113,7 @@ def convert_images(dev: device.DeviceController, device_model: Optional[str] = N
     print(get_string("act_key_matched").format(name=key_file.name))
 
     print(get_string("act_remaking_vbmeta"))
-    vbmeta_img = const.BASE_DIR / "vbmeta.img"
+    vbmeta_img = const.BASE_DIR / const.FN_VBMETA
     remake_cmd = [
         str(const.PYTHON_EXE), str(const.AVBTOOL_PY), "make_vbmeta_image",
         "--output", str(vbmeta_img),
@@ -131,10 +131,10 @@ def convert_images(dev: device.DeviceController, device_model: Optional[str] = N
 
     print(get_string("act_finalize"))
     print(get_string("act_rename_final"))
-    final_vendor_boot = const.BASE_DIR / "vendor_boot.img"
-    shutil.move(const.BASE_DIR / "vendor_boot_prc.img", final_vendor_boot)
+    final_vendor_boot = const.BASE_DIR / const.FN_VENDOR_BOOT
+    shutil.move(const.BASE_DIR / const.FN_VENDOR_BOOT_PRC, final_vendor_boot)
 
-    final_images = [final_vendor_boot, const.BASE_DIR / "vbmeta.img"]
+    final_images = [final_vendor_boot, const.BASE_DIR / const.FN_VBMETA]
 
     print(get_string("act_move_final").format(dir=const.OUTPUT_DIR.name))
     const.OUTPUT_DIR.mkdir(exist_ok=True)
@@ -201,11 +201,11 @@ def edit_devinfo_persist() -> None:
     print(get_string("act_wait_dp"))
     const.BACKUP_DIR.mkdir(exist_ok=True) 
 
-    devinfo_img_src = const.BACKUP_DIR / "devinfo.img"
-    persist_img_src = const.BACKUP_DIR / "persist.img"
+    devinfo_img_src = const.BACKUP_DIR / const.FN_DEVINFO
+    persist_img_src = const.BACKUP_DIR / const.FN_PERSIST
     
-    devinfo_img = const.BASE_DIR / "devinfo.img"
-    persist_img = const.BASE_DIR / "persist.img"
+    devinfo_img = const.BASE_DIR / const.FN_DEVINFO
+    persist_img = const.BASE_DIR / const.FN_PERSIST
 
     if not devinfo_img_src.exists() and not persist_img_src.exists():
         prompt = get_string("act_prompt_dp").format(dir=const.BACKUP_DIR.name)
@@ -214,8 +214,8 @@ def edit_devinfo_persist() -> None:
             print(get_string("act_wait_files_title"))
             print(prompt)
             print(get_string("act_place_one_file").format(dir=const.BACKUP_DIR.name))
-            print(get_string("act_dp_list_item").format(filename="devinfo.img"))
-            print(get_string("act_dp_list_item").format(filename="persist.img"))
+            print(get_string("act_dp_list_item").format(filename=const.FN_DEVINFO))
+            print(get_string("act_dp_list_item").format(filename=const.FN_PERSIST))
             print(get_string("utils_press_enter"))
             try:
                 input()
@@ -248,7 +248,7 @@ def edit_devinfo_persist() -> None:
     status_messages = []
     files_found = 0
     
-    display_order = ["persist.img", "devinfo.img"]
+    display_order = [const.FN_PERSIST, const.FN_DEVINFO]
     
     for fname in display_order:
         if fname in detected_codes:
@@ -282,8 +282,8 @@ def edit_devinfo_persist() -> None:
         persist_img.unlink(missing_ok=True)
         
         print(get_string("act_safety_remove"))
-        (const.IMAGE_DIR / "devinfo.img").unlink(missing_ok=True)
-        (const.IMAGE_DIR / "persist.img").unlink(missing_ok=True)
+        (const.IMAGE_DIR / const.FN_DEVINFO).unlink(missing_ok=True)
+        (const.IMAGE_DIR / const.FN_PERSIST).unlink(missing_ok=True)
         return
 
     if choice == 'y':
@@ -295,9 +295,9 @@ def edit_devinfo_persist() -> None:
         modified_persist = const.BASE_DIR / "persist_modified.img"
         
         if modified_devinfo.exists():
-            shutil.move(modified_devinfo, const.OUTPUT_DP_DIR / "devinfo.img")
+            shutil.move(modified_devinfo, const.OUTPUT_DP_DIR / const.FN_DEVINFO)
         if modified_persist.exists():
-            shutil.move(modified_persist, const.OUTPUT_DP_DIR / "persist.img")
+            shutil.move(modified_persist, const.OUTPUT_DP_DIR / const.FN_PERSIST)
             
         print(get_string("act_dp_moved").format(dir=const.OUTPUT_DP_DIR.name))
         

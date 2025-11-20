@@ -45,8 +45,8 @@ def read_anti_rollback(dumped_boot_path: Path, dumped_vbmeta_path: Path) -> Tupl
 
     print(get_string("act_arb_step2"))
     print(get_string("act_extract_new_indices"))
-    new_boot_img = const.IMAGE_DIR / "boot.img"
-    new_vbmeta_img = const.IMAGE_DIR / "vbmeta_system.img"
+    new_boot_img = const.IMAGE_DIR / const.FN_BOOT
+    new_vbmeta_img = const.IMAGE_DIR / const.FN_VBMETA_SYSTEM
 
     if not new_boot_img.exists() or not new_vbmeta_img.exists():
         print(get_string("act_err_new_rom_missing").format(dir=const.IMAGE_DIR.name))
@@ -102,19 +102,19 @@ def patch_anti_rollback(comparison_result: Tuple[str, int, int]) -> None:
         print(get_string("act_arb_step3"))
         
         patch_chained_image_rollback(
-            image_name="boot.img",
+            image_name=const.FN_BOOT,
             current_rb_index=current_boot_rb,
-            new_image_path=(const.IMAGE_DIR / "boot.img"),
-            patched_image_path=(const.OUTPUT_ANTI_ROLLBACK_DIR / "boot.img")
+            new_image_path=(const.IMAGE_DIR / const.FN_BOOT),
+            patched_image_path=(const.OUTPUT_ANTI_ROLLBACK_DIR / const.FN_BOOT)
         )
         
         print("-" * 20)
         
         patch_vbmeta_image_rollback(
-            image_name="vbmeta_system.img",
+            image_name=const.FN_VBMETA_SYSTEM,
             current_rb_index=current_vbmeta_rb,
-            new_image_path=(const.IMAGE_DIR / "vbmeta_system.img"),
-            patched_image_path=(const.OUTPUT_ANTI_ROLLBACK_DIR / "vbmeta_system.img")
+            new_image_path=(const.IMAGE_DIR / const.FN_VBMETA_SYSTEM),
+            patched_image_path=(const.OUTPUT_ANTI_ROLLBACK_DIR / const.FN_VBMETA_SYSTEM)
         )
 
         print("\n" + "=" * 61)
