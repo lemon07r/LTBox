@@ -9,6 +9,7 @@ from typing import Tuple, Dict, Callable, Any
 from . import downloader, i18n
 from .i18n import get_string
 from .logger import logging_context
+from .utils import ui
 
 APP_DIR = Path(__file__).parent.resolve()
 BASE_DIR = APP_DIR.parent
@@ -49,35 +50,36 @@ def setup_console():
 def check_path_encoding():
     current_path = str(Path(__file__).parent.parent.resolve())
     if not current_path.isascii():
-        os.system('cls')
-        print("\n" + "!" * 65)
-        print(get_string("critical_error_path_encoding"))
-        print("  " + "-" * 60)
-        print(get_string("current_path").format(current_path=current_path))
-        print("  " + "-" * 60)
-        print(get_string("path_encoding_details_1"))
-        print(get_string("path_encoding_details_2"))
-        print("\n" + get_string("action_required"))
-        print(get_string("action_required_details"))
-        print(get_string("example_path"))
-        print("!" * 65 + "\n")
+        ui.clear()
+        ui.box_output([
+            get_string("critical_error_path_encoding"),
+            "  " + "-" * 55,
+            get_string("current_path").format(current_path=current_path),
+            "  " + "-" * 55,
+            get_string("path_encoding_details_1"),
+            get_string("path_encoding_details_2"),
+            "",
+            get_string("action_required"),
+            get_string("action_required_details"),
+            get_string("example_path")
+        ], err=True)
         
         os.system("pause")
         raise RuntimeError(get_string("critical_error_path_encoding"))
 
 def run_task(command, title, dev, command_map):
-    os.system('cls')
+    ui.clear()
     
-    print("  " + "=" * 58)
-    print(get_string("starting_task").format(title=title))
-    print("  " + "=" * 58, "\n")
+    ui.echo("  " + "=" * 58)
+    ui.echo(get_string("starting_task").format(title=title))
+    ui.echo("  " + "=" * 58 + "\n")
 
     log_file = None
     if command in ["patch_all", "patch_all_wipe"]:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         log_file = f"log_{timestamp}.txt"
-        print(get_string("logging_enabled").format(log_file=log_file))
-        print(get_string("logging_command").format(command=command))
+        ui.info(get_string("logging_enabled").format(log_file=log_file))
+        ui.info(get_string("logging_command").format(command=command))
 
     try:
         with logging_context(log_file):
@@ -100,58 +102,50 @@ def run_task(command, title, dev, command_map):
             
             result = func(**final_kwargs)
 
-            print("\n" + "=" * 61)
-            print(get_string("act_success"))
-            print("=" * 61)
+            ui.echo("\n" + "=" * 61)
+            ui.echo(get_string("act_success"))
+            ui.echo("=" * 61)
 
             if isinstance(result, str) and result:
-                print(result)
+                ui.echo(result)
             elif isinstance(result, tuple) and command == "read_anti_rollback":
-                 print(get_string("act_arb_complete").format(status=result[0]))
-                 print(get_string("act_curr_boot_idx").format(idx=result[1]))
-                 print(get_string("act_curr_vbmeta_idx").format(idx=result[2]))
+                 ui.echo(get_string("act_arb_complete").format(status=result[0]))
+                 ui.echo(get_string("act_curr_boot_idx").format(idx=result[1]))
+                 ui.echo(get_string("act_curr_vbmeta_idx").format(idx=result[2]))
             elif command == "clean":
                 pass
             elif result:
-                print(get_string("act_unhandled_success_result").format(res=result))
-
+                ui.echo(get_string("act_unhandled_success_result").format(res=result))
 
     except ToolError as e:
-        print("\n" + "!" * 61, file=sys.stderr)
-        print(get_string("task_failed").format(title=title), file=sys.stderr)
-        print(str(e), file=sys.stderr)
-        print("!" * 61, file=sys.stderr)
+        ui.box_output([get_string("task_failed").format(title=title), str(e)], err=True)
     except subprocess.CalledProcessError as e:
-        print("\n" + "!" * 61, file=sys.stderr)
-        cmd_str = " ".join(e.cmd) if isinstance(e.cmd, list) else e.cmd
-        print(get_string("err_cmd_failed").format(cmd=cmd_str), file=sys.stderr)
+        msgs = [get_string("err_cmd_failed").format(cmd=" ".join(e.cmd) if isinstance(e.cmd, list) else e.cmd)]
         if e.stdout:
-            print(f"{get_string('err_cmd_stdout_header')}\n{e.stdout}", file=sys.stderr)
+            msgs.append(f"{get_string('err_cmd_stdout_header')}\n{e.stdout}")
         if e.stderr:
-            print(f"{get_string('err_cmd_stderr_header')}\n{e.stderr}", file=sys.stderr)
-        print("!" * 61, file=sys.stderr)
+            msgs.append(f"{get_string('err_cmd_stderr_header')}\n{e.stderr}")
+        ui.box_output(msgs, err=True)
     except (FileNotFoundError, RuntimeError, KeyError) as e:
         if not isinstance(e, SystemExit):
-            print("\n" + "!" * 61, file=sys.stderr)
-            print(get_string("unexpected_error").format(e=e), file=sys.stderr)
-            print("!" * 61, file=sys.stderr)
+            ui.box_output([get_string("unexpected_error").format(e=e)], err=True)
     except SystemExit:
-        print(get_string("process_halted"), file=sys.stderr)
+        ui.error(get_string("process_halted"))
     except KeyboardInterrupt:
-        print(get_string("process_cancelled"), file=sys.stderr)
+        ui.error(get_string("process_cancelled"))
     finally:
-        print()
+        ui.echo("")
         if log_file:
-            print(get_string("logging_finished").format(log_file=log_file))
+            ui.info(get_string("logging_finished").format(log_file=log_file))
 
-        print("  " + "=" * 58)
-        print(get_string("task_completed").format(title=title))
-        print("  " + "=" * 58, "\n")
+        ui.echo("  " + "=" * 58)
+        ui.echo(get_string("task_completed").format(title=title))
+        ui.echo("  " + "=" * 58 + "\n")
         
         if command == "clean":
-            print(get_string("press_any_key_to_exit"))
+            ui.echo(get_string("press_any_key_to_exit"))
         else:
-            print(get_string("press_any_key_to_return"))
+            ui.echo(get_string("press_any_key_to_return"))
 
         os.system(f"pause > nul & echo {get_string('press_any_key')}")
 
@@ -423,13 +417,13 @@ def entry_point():
             
         i18n.load_lang(lang_code)
         
-        os.system('cls')
+        ui.clear()
 
         try:
             downloader.install_base_tools(lang_code)
         except (subprocess.CalledProcessError, FileNotFoundError, ToolError) as e:
-            print(get_string("critical_err_base_tools").format(e=e), file=sys.stderr)
-            print(get_string("err_run_install_manually"), file=sys.stderr)
+            ui.error(get_string("critical_err_base_tools").format(e=e))
+            ui.error(get_string("err_run_install_manually"))
             os.system("pause")
             sys.exit(1)
 
@@ -466,9 +460,9 @@ def entry_point():
             avb_patch_module = avb
 
         except ImportError as e:
-            print(get_string("err_import_ltbox"), file=sys.stderr)
-            print(get_string("err_details").format(e=e), file=sys.stderr)
-            print(get_string("err_ensure_ltbox_present"), file=sys.stderr)
+            ui.error(get_string("err_import_ltbox"))
+            ui.error(get_string("err_details").format(e=e))
+            ui.error(get_string("err_ensure_ltbox_present"))
             os.system("pause")
             sys.exit(1)
 
@@ -478,20 +472,20 @@ def entry_point():
             if len(sys.argv) > 2:
                 run_info_scan(sys.argv[2:], constants_module, avb_patch_module)
             else:
-                print(get_string("info_no_files_dragged"), file=sys.stderr)
-                print(get_string("info_drag_files_prompt"), file=sys.stderr)
+                ui.error(get_string("info_no_files_dragged"))
+                ui.error(get_string("info_drag_files_prompt"))
             
             os.system("pause")
         else:
             main_loop(device_controller_class, COMMAND_MAP)
 
     except (RuntimeError, ToolError) as e:
-        print(get_string("err_fatal_abort"), file=sys.stderr)
-        print(get_string("err_fatal_details").format(e=e), file=sys.stderr)
+        ui.error(get_string("err_fatal_abort"))
+        ui.error(get_string("err_fatal_details").format(e=e))
         os.system("pause")
         sys.exit(1)
     except KeyboardInterrupt:
-        print(get_string("err_fatal_user_cancel"), file=sys.stderr)
+        ui.error(get_string("err_fatal_user_cancel"))
         sys.exit(0)
 
 if __name__ == "__main__":

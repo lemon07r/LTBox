@@ -15,6 +15,22 @@ class ConsoleUI:
         dest = sys.stderr if err else sys.stdout
         print(message, file=dest)
 
+    def info(self, message: str) -> None:
+        self.echo(message)
+
+    def warn(self, message: str) -> None:
+        self.echo(f"[!] {message}", err=True)
+
+    def error(self, message: str) -> None:
+        self.echo(f"[!] {message}", err=True)
+
+    def box_output(self, lines: List[str], err: bool = False) -> None:
+        width = 61
+        self.echo("\n" + "!" * width, err=err)
+        for line in lines:
+             self.echo(line, err=err)
+        self.echo("!" * width + "\n", err=err)
+
     def prompt(self, message: str = "") -> str:
         return input(message)
 
