@@ -197,14 +197,25 @@ def print_main_menu(skip_adb, skip_rollback):
     print("\n  " + "=" * 58)
     print(get_string("menu_main_title"))
     print("  " + "=" * 58 + "\n")
+
+    print(f"  {get_string('menu_main_sub_install')}")
     print(get_string("menu_main_1"))
     print(get_string("menu_main_2"))
+    print("")
+
+    print(f"  {get_string('menu_main_sub_manage')}")
     print(get_string("menu_main_3"))
     print(get_string("menu_main_4"))
     print(get_string("menu_main_5"))
+    print("")
+
+    print(f"  {get_string('menu_main_sub_settings')}")
     print(get_string("menu_main_6").format(skip_adb_state=skip_adb_state))
     print(get_string("menu_main_7").format(skip_rb_state=skip_rb_state))
-    print("\n" + get_string("menu_main_a"))
+    print("")
+
+    print(f"  {get_string('menu_main_sub_nav')}")
+    print(get_string("menu_main_a"))
     print(get_string("menu_main_x"))
     print("\n  " + "=" * 58 + "\n")
 
@@ -213,19 +224,36 @@ def print_advanced_menu():
     print("\n  " + "=" * 58)
     print(get_string("menu_adv_title"))
     print("  " + "=" * 58 + "\n")
+
+    print(f"  {get_string('menu_adv_sub_region_dump')}")
     print(get_string("menu_adv_1"))
     print(get_string("menu_adv_2"))
+    print("")
+
+    print(f"  {get_string('menu_adv_sub_patch_region')}")
     print(get_string("menu_adv_3"))
     print(get_string("menu_adv_4"))
+    print("")
+
+    print(f"  {get_string('menu_adv_sub_arb')}")
     print(get_string("menu_adv_5"))
     print(get_string("menu_adv_6"))
     print(get_string("menu_adv_7"))
+    print("")
+
+    print(f"  {get_string('menu_adv_sub_xml_flash')}")
     print(get_string("menu_adv_8"))
     print(get_string("menu_adv_9"))
     print(get_string("menu_adv_10"))
     print(get_string("menu_adv_11"))
+    print("")
+
+    print(f"  {get_string('menu_adv_sub_maint')}")
     print(get_string("menu_adv_12"))
-    print("\n" + get_string("menu_adv_m"))
+    print("")
+
+    print(f"  {get_string('menu_adv_sub_nav')}")
+    print(get_string("menu_adv_m"))
     print(get_string("menu_main_x"))
     print("\n  " + "=" * 58 + "\n")
 
