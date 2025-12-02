@@ -14,7 +14,8 @@ from .edl import (
 
 from .region import (
     convert_region_images,
-    edit_devinfo_persist
+    edit_devinfo_persist,
+    rescue_after_ota
 )
 
 from .root import (

@@ -205,24 +205,25 @@ def print_main_menu(skip_adb, skip_rollback):
     print("  " + "=" * 78 + "\n")
 
     print(f"  {get_string('menu_main_sub_install')}")
-    print(get_string("menu_main_1"))
-    print(get_string("menu_main_2"))
+    print(get_string("menu_main_install_wipe"))
+    print(get_string("menu_main_install_keep"))
     print("")
 
     print(f"  {get_string('menu_main_sub_manage')}")
-    print(get_string("menu_main_3"))
-    print(get_string("menu_main_4"))
-    print(get_string("menu_main_5"))
+    print(get_string("menu_main_disable_ota"))
+    print(get_string("menu_main_rescue"))
+    print(get_string("menu_main_root"))
+    print(get_string("menu_main_unroot"))
     print("")
 
     print(f"  {get_string('menu_main_sub_settings')}")
-    print(get_string("menu_main_6").format(skip_adb_state=skip_adb_state))
-    print(get_string("menu_main_7").format(skip_rb_state=skip_rb_state))
+    print(get_string("menu_main_skip_adb").format(skip_adb_state=skip_adb_state))
+    print(get_string("menu_main_skip_rb").format(skip_rb_state=skip_rb_state))
     print("")
 
     print(f"  {get_string('menu_main_sub_nav')}")
-    print(get_string("menu_main_a"))
-    print(get_string("menu_main_x"))
+    print(get_string("menu_main_adv"))
+    print(get_string("menu_main_exit"))
     print("\n  " + "=" * 78 + "\n")
 
 def print_advanced_menu():
@@ -260,7 +261,7 @@ def print_advanced_menu():
 
     print(f"  {get_string('menu_adv_sub_nav')}")
     print(get_string("menu_adv_m"))
-    print(get_string("menu_main_x"))
+    print(get_string("menu_main_exit"))
     print("\n  " + "=" * 78 + "\n")
 
 def advanced_menu(dev, command_map):
@@ -304,7 +305,7 @@ def print_root_mode_selection_menu():
     print(get_string("menu_root_mode_1"))
     print(get_string("menu_root_mode_2"))
     print("\n" + get_string("menu_root_m"))
-    print(get_string("menu_main_x"))
+    print(get_string("menu_main_exit"))
     print("\n  " + "=" * 78 + "\n")
 
 def root_mode_selection_menu(dev, command_map):
@@ -336,7 +337,7 @@ def print_root_menu(gki: bool):
         print(get_string("menu_root_1_lkm"))
         print(get_string("menu_root_2_lkm"))
     print("\n" + get_string("menu_root_m"))
-    print(get_string("menu_main_x"))
+    print(get_string("menu_main_exit"))
     print("\n  " + "=" * 78 + "\n")
 
 def root_menu(dev, command_map, gki: bool):
@@ -375,7 +376,8 @@ def main_loop(device_controller_class, command_map):
         "1": ("patch_all_wipe", get_string("task_title_install_wipe")),
         "2": ("patch_all", get_string("task_title_install_nowipe")),
         "3": ("disable_ota", get_string("task_title_disable_ota")),
-        "5": ("unroot_device", get_string("task_title_unroot")),
+        "4": ("rescue_ota", get_string("task_title_rescue")),
+        "6": ("unroot_device", get_string("task_title_unroot")),
     }
 
     while True:
@@ -388,12 +390,12 @@ def main_loop(device_controller_class, command_map):
             if cmd in ["patch_all", "patch_all_wipe"]:
                 extras["skip_rollback"] = skip_rollback
             run_task(cmd, title, dev, command_map, extra_kwargs=extras)
-        elif choice == "4":
+        elif choice == "5":
             root_mode_selection_menu(dev, command_map)
-        elif choice == "6":
+        elif choice == "7":
             skip_adb = not skip_adb
             dev.skip_adb = skip_adb
-        elif choice == "7":
+        elif choice == "8":
             skip_rollback = not skip_rollback
         elif choice == "a":
             advanced_menu(dev, command_map)
@@ -481,6 +483,7 @@ def entry_point():
                 "patch_root_image_file_lkm": (a.patch_root_image_file, {"gki": False}),
                 "unroot_device": (a.unroot_device, {}),
                 "disable_ota": (a.disable_ota, {}),
+                "rescue_ota": (a.rescue_after_ota, {}),
                 "edit_dp": (a.edit_devinfo_persist, {}),
                 "dump_partitions": (a.dump_partitions, {}),
                 "flash_partitions": (a.flash_partitions, {}),

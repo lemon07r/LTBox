@@ -309,3 +309,121 @@ def edit_devinfo_persist() -> Optional[str]:
         print("  " + "=" * 78)
     
     return backup_critical_dir.name
+
+def rescue_after_ota(dev: device.DeviceController) -> None:
+    from . import edl
+    from ..partition import ensure_params_or_fail
+
+    utils.ui.echo(get_string("rescue_prompt_files"))
+    utils.wait_for_files(const.IMAGE_DIR, [const.EDL_LOADER_FILENAME], get_string("rescue_prompt_files"))
+    
+    if not list(const.IMAGE_DIR.glob("rawprogram*.xml")):
+         utils.ui.echo(get_string("act_err_no_xmls").format(dir=const.IMAGE_DIR.name))
+         utils.wait_for_directory(const.IMAGE_DIR, get_string("act_prompt_image"))
+
+    utils.ui.echo(get_string("rescue_wait_adb"))
+    dev.wait_for_adb()
+    
+    utils.ui.echo(get_string("rescue_reboot_edl"))
+    dev.reboot_to_edl()
+    
+    slots = ['a', 'b']
+    targets = [f'vendor_boot_{s}' for s in slots] + [f'vbmeta_{s}' for s in slots]
+    
+    edl.dump_partitions(dev, skip_reset=False, additional_targets=targets, default_targets=False)
+    
+    const.OUTPUT_DIR.mkdir(exist_ok=True)
+    patched_map = {}
+
+    for slot in slots:
+        vb_target = f'vendor_boot_{slot}'
+        vbmeta_target = f'vbmeta_{slot}'
+        
+        vb_path = const.BACKUP_DIR / f"{vb_target}.img"
+        vbmeta_path = const.BACKUP_DIR / f"{vbmeta_target}.img"
+        
+        if not vb_path.exists() or not vbmeta_path.exists():
+            continue
+
+        prc_temp = const.BASE_DIR / const.FN_VENDOR_BOOT_PRC
+        prc_temp.unlink(missing_ok=True)
+
+        try:
+            utils.ui.echo(get_string("rescue_patching_slot").format(slot=slot))
+            edit_vendor_boot(str(vb_path))
+        except Exception as e:
+            utils.ui.echo(f"Skipping {slot} due to patch error or no change: {e}")
+            continue
+
+        if not prc_temp.exists():
+            continue
+
+        dest_vb = const.OUTPUT_DIR / f"{vb_target}.img"
+        shutil.move(prc_temp, dest_vb)
+        patched_map[vb_target] = dest_vb
+        
+        utils.ui.echo(get_string("rescue_remaking_vbmeta").format(slot=slot))
+        
+        vbmeta_info = extract_image_avb_info(vbmeta_path)
+        vb_info = extract_image_avb_info(vb_path)
+
+        part_size = vb_info.get('partition_size', vb_info.get('data_size'))
+        
+        cmd_footer = [
+            str(const.PYTHON_EXE), str(const.AVBTOOL_PY), "add_hash_footer",
+            "--image", str(dest_vb),
+            "--partition_size", part_size,
+            "--partition_name", "vendor_boot",
+            "--rollback_index", vb_info.get('rollback', '0'),
+            "--salt", vb_info.get('salt', '')
+        ]
+        
+        if 'props_args' in vb_info:
+            cmd_footer.extend(vb_info['props_args'])
+        
+        if 'flags' in vb_info:
+            cmd_footer.extend(["--flags", vb_info['flags']])
+            
+        utils.run_command(cmd_footer)
+        
+        pubkey = vbmeta_info.get('pubkey_sha1')
+        key_file = const.KEY_MAP.get(pubkey)
+        if not key_file:
+             utils.ui.echo(get_string("act_err_unknown_key").format(key=pubkey))
+             continue
+             
+        dest_vbmeta = const.OUTPUT_DIR / f"{vbmeta_target}.img"
+        
+        cmd_make = [
+            str(const.PYTHON_EXE), str(const.AVBTOOL_PY), "make_vbmeta_image",
+            "--output", str(dest_vbmeta),
+            "--key", str(key_file),
+            "--algorithm", vbmeta_info['algorithm'],
+            "--padding_size", "8192",
+            "--flags", vbmeta_info.get('flags', '0'),
+            "--rollback_index", vbmeta_info.get('rollback', '0'),
+            "--include_descriptors_from_image", str(vbmeta_path),
+            "--include_descriptors_from_image", str(dest_vb)
+        ]
+        utils.run_command(cmd_make)
+        patched_map[vbmeta_target] = dest_vbmeta
+
+    if not patched_map:
+        utils.ui.echo(get_string("rescue_nothing_to_flash"))
+        return
+
+    utils.ui.echo(get_string("rescue_wait_adb_flash"))
+    dev.wait_for_adb()
+    
+    utils.ui.echo(get_string("rescue_reboot_edl"))
+    dev.reboot_to_edl()
+    
+    port = edl._prepare_edl_session(dev)
+    
+    for target, path in patched_map.items():
+        utils.ui.echo(get_string("rescue_flashing_target").format(target=target))
+        params = ensure_params_or_fail(target)
+        dev.edl_write_partition(port, path, params['lun'], params['start_sector'])
+        
+    utils.ui.echo(get_string("act_reset_sys"))
+    dev.edl_reset(port)
