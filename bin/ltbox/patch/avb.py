@@ -258,3 +258,38 @@ def process_boot_image_avb(image_to_process: Path, gki: bool = False) -> None:
 
         utils.run_command(add_footer_cmd)
         print(get_string("img_footer_success").format(name=image_to_process.name))
+
+def rebuild_vbmeta_with_chained_images(
+    output_path: Path,
+    original_vbmeta_path: Path,
+    chained_images: List[Path],
+    padding_size: str = "8192"
+) -> None:
+    print(get_string("act_remake_vbmeta"))
+    vbmeta_info = extract_image_avb_info(original_vbmeta_path)
+    
+    vbmeta_pubkey = vbmeta_info.get('pubkey_sha1')
+    key_file = const.KEY_MAP.get(vbmeta_pubkey) 
+
+    print(get_string("act_verify_vbmeta_key"))
+    if not key_file:
+        print(get_string("act_err_vbmeta_key_mismatch").format(key=vbmeta_pubkey))
+        raise KeyError(get_string("act_err_unknown_key").format(key=vbmeta_pubkey))
+    print(get_string("act_key_matched").format(name=key_file.name))
+
+    print(get_string("act_remaking_vbmeta"))
+    cmd = [
+        str(const.PYTHON_EXE), str(const.AVBTOOL_PY), "make_vbmeta_image",
+        "--output", str(output_path),
+        "--key", str(key_file),
+        "--algorithm", vbmeta_info['algorithm'],
+        "--padding_size", padding_size,
+        "--flags", vbmeta_info.get('flags', '0'),
+        "--rollback_index", vbmeta_info.get('rollback', '0'),
+        "--include_descriptors_from_image", str(original_vbmeta_path)
+    ]
+    
+    for img in chained_images:
+        cmd.extend(["--include_descriptors_from_image", str(img)])
+        
+    utils.run_command(cmd)

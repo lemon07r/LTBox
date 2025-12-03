@@ -13,7 +13,7 @@ from ..errors import ToolError
 from ..partition import ensure_params_or_fail
 from .system import detect_active_slot_robust
 from ..patch.root import patch_boot_with_root_algo
-from ..patch.avb import process_boot_image_avb, extract_image_avb_info
+from ..patch.avb import process_boot_image_avb, extract_image_avb_info, rebuild_vbmeta_with_chained_images
 from ..i18n import get_string
 
 def _patch_lkm_via_app(
@@ -191,33 +191,14 @@ def patch_root_image_file(gki: bool = False) -> None:
         process_boot_image_avb(patched_boot_path, gki=gki)
 
         if not gki:
-            utils.ui.echo(get_string("act_remake_vbmeta"))
             vbmeta_bak = const.BASE_DIR / vbmeta_bak_name
-            vbmeta_info = extract_image_avb_info(vbmeta_bak)
-            
-            vbmeta_pubkey = vbmeta_info.get('pubkey_sha1')
-            key_file = const.KEY_MAP.get(vbmeta_pubkey) 
-
-            utils.ui.echo(get_string("act_verify_vbmeta_key"))
-            if not key_file:
-                utils.ui.echo(get_string("act_err_vbmeta_key_mismatch").format(key=vbmeta_pubkey))
-                raise KeyError(get_string("act_err_unknown_key").format(key=vbmeta_pubkey))
-            utils.ui.echo(get_string("act_key_matched").format(name=key_file.name))
-            
-            utils.ui.echo(get_string("act_remaking_vbmeta"))
             patched_vbmeta_path = const.BASE_DIR / const.FN_VBMETA_ROOT
-            remake_cmd = [
-                str(const.PYTHON_EXE), str(const.AVBTOOL_PY), "make_vbmeta_image",
-                "--output", str(patched_vbmeta_path),
-                "--key", str(key_file),
-                "--algorithm", vbmeta_info['algorithm'],
-                "--padding_size", "8192",
-                "--flags", vbmeta_info.get('flags', '0'),
-                "--rollback_index", vbmeta_info.get('rollback', '0'),
-                "--include_descriptors_from_image", str(vbmeta_bak),
-                "--include_descriptors_from_image", str(patched_boot_path) 
-            ]
-            utils.run_command(remake_cmd)
+            
+            rebuild_vbmeta_with_chained_images(
+                output_path=patched_vbmeta_path,
+                original_vbmeta_path=vbmeta_bak,
+                chained_images=[patched_boot_path]
+            )
             utils.ui.echo("")
 
         utils.ui.echo(get_string("act_move_root_final").format(dir=out_dir_name))
@@ -425,33 +406,14 @@ def root_device(dev: device.DeviceController, gki: bool = False) -> None:
             raise
 
         if not gki:
-            utils.ui.echo(get_string("act_remake_vbmeta"))
             vbmeta_bak = base_vbmeta_bak
-            vbmeta_info = extract_image_avb_info(vbmeta_bak)
-            
-            vbmeta_pubkey = vbmeta_info.get('pubkey_sha1')
-            key_file = const.KEY_MAP.get(vbmeta_pubkey) 
-
-            utils.ui.echo(get_string("act_verify_vbmeta_key"))
-            if not key_file:
-                utils.ui.echo(get_string("act_err_vbmeta_key_mismatch").format(key=vbmeta_pubkey))
-                raise KeyError(get_string("act_err_unknown_key").format(key=vbmeta_pubkey))
-            utils.ui.echo(get_string("act_key_matched").format(name=key_file.name))
-            
-            utils.ui.echo(get_string("act_remaking_vbmeta"))
             patched_vbmeta_path = const.BASE_DIR / const.FN_VBMETA_ROOT
-            remake_cmd = [
-                str(const.PYTHON_EXE), str(const.AVBTOOL_PY), "make_vbmeta_image",
-                "--output", str(patched_vbmeta_path),
-                "--key", str(key_file),
-                "--algorithm", vbmeta_info['algorithm'],
-                "--padding_size", "8192",
-                "--flags", vbmeta_info.get('flags', '0'),
-                "--rollback_index", vbmeta_info.get('rollback', '0'),
-                "--include_descriptors_from_image", str(vbmeta_bak),
-                "--include_descriptors_from_image", str(patched_boot_path) 
-            ]
-            utils.run_command(remake_cmd)
+            
+            rebuild_vbmeta_with_chained_images(
+                output_path=patched_vbmeta_path,
+                original_vbmeta_path=vbmeta_bak,
+                chained_images=[patched_boot_path]
+            )
             utils.ui.echo("")
             shutil.move(patched_vbmeta_path, final_vbmeta_img)
             utils.ui.echo(get_string("act_patched_boot_saved").format(dir=final_vbmeta_img.parent.name))

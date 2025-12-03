@@ -10,7 +10,7 @@ from .. import constants as const
 from .. import utils, device
 from ..partition import ensure_params_or_fail
 from ..patch.region import edit_vendor_boot, detect_country_codes, patch_country_codes
-from ..patch.avb import extract_image_avb_info
+from ..patch.avb import extract_image_avb_info, rebuild_vbmeta_with_chained_images
 from ..i18n import get_string
 
 def convert_region_images(dev: device.DeviceController, device_model: Optional[str] = None) -> None:
@@ -55,7 +55,6 @@ def convert_region_images(dev: device.DeviceController, device_model: Optional[s
     print(get_string("act_conv_success"))
 
     print(get_string("act_extract_info"))
-    vbmeta_info = extract_image_avb_info(vbmeta_bak)
     vendor_boot_info = extract_image_avb_info(vendor_boot_bak)
     print(get_string("act_info_extracted"))
 
@@ -103,31 +102,12 @@ def convert_region_images(dev: device.DeviceController, device_model: Optional[s
 
     utils.run_command(add_hash_footer_cmd)
     
-    vbmeta_pubkey = vbmeta_info.get('pubkey_sha1')
-    key_file = const.KEY_MAP.get(vbmeta_pubkey) 
-
-    print(get_string("act_remake_vbmeta"))
-    print(get_string("act_verify_vbmeta_key"))
-    if not key_file:
-        print(get_string("act_err_vbmeta_key_mismatch").format(key=vbmeta_pubkey))
-        raise KeyError(get_string("act_err_unknown_key").format(key=vbmeta_pubkey))
-    print(get_string("act_key_matched").format(name=key_file.name))
-
-    print(get_string("act_remaking_vbmeta"))
     vbmeta_img = const.BASE_DIR / const.FN_VBMETA
-    remake_cmd = [
-        str(const.PYTHON_EXE), str(const.AVBTOOL_PY), "make_vbmeta_image",
-        "--output", str(vbmeta_img),
-        "--key", str(key_file),
-        "--algorithm", vbmeta_info['algorithm'],
-        "--padding_size", "8192",
-        "--flags", vbmeta_info.get('flags', '0'),
-        "--rollback_index", vbmeta_info.get('rollback', '0'),
-        "--include_descriptors_from_image", str(vbmeta_bak),
-        "--include_descriptors_from_image", str(vendor_boot_prc) 
-    ]
-        
-    utils.run_command(remake_cmd)
+    rebuild_vbmeta_with_chained_images(
+        output_path=vbmeta_img,
+        original_vbmeta_path=vbmeta_bak,
+        chained_images=[vendor_boot_prc]
+    )
     print()
 
     print(get_string("act_finalize"))
@@ -363,7 +343,6 @@ def rescue_after_ota(dev: device.DeviceController) -> None:
         
         utils.ui.echo(get_string("rescue_remaking_vbmeta").format(slot=slot))
 
-        vbmeta_info = extract_image_avb_info(vbmeta_path)
         vb_info = extract_image_avb_info(vb_path)
         part_size = vb_info.get('partition_size', vb_info.get('data_size'))
         
@@ -379,25 +358,13 @@ def rescue_after_ota(dev: device.DeviceController) -> None:
         if 'flags' in vb_info: cmd_footer.extend(["--flags", vb_info['flags']])
         utils.run_command(cmd_footer)
         
-        pubkey = vbmeta_info.get('pubkey_sha1')
-        key_file = const.KEY_MAP.get(pubkey)
-        if not key_file:
-             utils.ui.echo(get_string("act_err_unknown_key").format(key=pubkey))
-             continue
-             
         dest_vbmeta = const.OUTPUT_DIR / f"{vbmeta_target}.img"
-        cmd_make = [
-            str(const.PYTHON_EXE), str(const.AVBTOOL_PY), "make_vbmeta_image",
-            "--output", str(dest_vbmeta),
-            "--key", str(key_file),
-            "--algorithm", vbmeta_info['algorithm'],
-            "--padding_size", "8192",
-            "--flags", vbmeta_info.get('flags', '0'),
-            "--rollback_index", vbmeta_info.get('rollback', '0'),
-            "--include_descriptors_from_image", str(vbmeta_path),
-            "--include_descriptors_from_image", str(dest_vb)
-        ]
-        utils.run_command(cmd_make)
+        
+        rebuild_vbmeta_with_chained_images(
+            output_path=dest_vbmeta,
+            original_vbmeta_path=vbmeta_path,
+            chained_images=[dest_vb]
+        )
 
         patched_map[vbmeta_target] = dest_vbmeta
 
