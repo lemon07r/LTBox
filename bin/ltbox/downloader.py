@@ -258,6 +258,49 @@ def get_gki_kernel(kernel_version: str, work_dir: Path) -> Path:
         utils.ui.echo(get_string("dl_gki_download_fail").format(version=kernel_version))
         raise ToolError(f"{e}")
 
+def ensure_openssl() -> None:
+    openssl_exe = const.DOWNLOAD_DIR / "openssl.exe"
+    if openssl_exe.exists():
+        return
+
+    utils.ui.echo(get_string("dl_downloading").format(filename="OpenSSL"))
+
+    url = const._get_cfg("tools", "openssl_url")
+    temp_zip = const.DOWNLOAD_DIR / "openssl.zip"
+    
+    try:
+        import requests
+        with requests.get(url, stream=True) as r:
+            r.raise_for_status()
+            with open(temp_zip, 'wb') as f:
+                shutil.copyfileobj(r.raw, f)
+
+        with zipfile.ZipFile(temp_zip, 'r') as zf:
+            for member in zf.infolist():
+                if member.is_dir():
+                    continue
+
+                if "x64/bin/" in member.filename:
+                    filename = Path(member.filename).name
+                    if not filename:
+                        continue
+                        
+                    target_path = const.DOWNLOAD_DIR / filename
+                    
+                    with zf.open(member) as source, open(target_path, "wb") as target:
+                        shutil.copyfileobj(source, target)
+        
+        utils.ui.echo(get_string("dl_tool_success").format(tool_name="OpenSSL"))
+        
+    except Exception as e:
+        utils.ui.error(f"Failed to download OpenSSL: {e}")
+        if temp_zip.exists():
+            temp_zip.unlink()
+        raise ToolError("OpenSSL download failed")
+    finally:
+        if temp_zip.exists():
+            temp_zip.unlink()
+
 def download_ksu_apk(target_dir: Path) -> None:
     utils.ui.echo(get_string("dl_ksu_downloading"))
     if list(target_dir.glob("*spoofed*.apk")):
@@ -330,6 +373,7 @@ def install_base_tools(lang_code: str = "en"):
         
         ensure_platform_tools()
         ensure_avb_tools()
+        ensure_openssl()
         utils.ui.echo(get_string("dl_base_complete"))
     except Exception as e:
         msg = get_string("dl_base_error").format(error=e)
