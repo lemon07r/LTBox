@@ -288,6 +288,7 @@ def _select_flash_xmls(skip_dp: bool = False) -> Tuple[List[Path], List[Path]]:
     persist_write_xml = const.IMAGE_DIR / "rawprogram_write_persist_unsparse0.xml"
     persist_save_xml = const.IMAGE_DIR / "rawprogram_save_persist_unsparse0.xml"
     raw_unsparse0 = const.IMAGE_DIR / "rawprogram_unsparse0.xml"
+    raw_unsparse0_half = const.IMAGE_DIR / "rawprogram_unsparse0-half.xml"
     
     devinfo_write_xml = const.IMAGE_DIR / "rawprogram4_write_devinfo.xml"
     devinfo_original_xml = const.IMAGE_DIR / "rawprogram4.xml"
@@ -299,7 +300,8 @@ def _select_flash_xmls(skip_dp: bool = False) -> Tuple[List[Path], List[Path]]:
         if x.name not in [
             persist_write_xml.name, 
             persist_save_xml.name, 
-            raw_unsparse0.name
+            raw_unsparse0.name,
+            raw_unsparse0_half.name
         ]
     ]
 
@@ -309,6 +311,9 @@ def _select_flash_xmls(skip_dp: bool = False) -> Tuple[List[Path], List[Path]]:
     elif persist_save_xml.exists():
         utils.ui.echo(get_string("act_skip_persist_flash"))
         raw_xmls.append(persist_save_xml)
+    elif raw_unsparse0_half.exists():
+        utils.ui.echo("Using rawprogram_unsparse0-half.xml (Save Persist Fallback)")
+        raw_xmls.append(raw_unsparse0_half)
     elif raw_unsparse0.exists():
         utils.ui.echo("Using rawprogram_unsparse0.xml (Full Wipe)")
         raw_xmls.append(raw_unsparse0)
