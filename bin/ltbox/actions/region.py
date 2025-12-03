@@ -8,6 +8,7 @@ from typing import Optional, List, Dict, Any
 from . import edl
 from .. import constants as const
 from .. import utils, device
+from ..partition import ensure_params_or_fail
 from ..patch.region import edit_vendor_boot, detect_region_codes, patch_region_codes
 from ..patch.avb import extract_image_avb_info
 from ..i18n import get_string
@@ -312,22 +313,19 @@ def edit_devinfo_persist() -> Optional[str]:
     return backup_critical_dir.name
 
 def rescue_after_ota(dev: device.DeviceController) -> None:
-    from . import edl
-    from ..partition import ensure_params_or_fail
-
     utils.ui.echo(get_string("rescue_prompt_files"))
 
     edl.ensure_edl_requirements()
 
     utils.ui.echo(get_string("rescue_wait_adb"))
     dev.wait_for_adb()
-    
+
     utils.ui.echo(get_string("rescue_reboot_edl"))
     dev.reboot_to_edl()
     
     slots = ['a', 'b']
     targets = [f'vendor_boot_{s}' for s in slots] + [f'vbmeta_{s}' for s in slots]
-    
+
     edl.dump_partitions(dev, skip_reset=False, additional_targets=targets, default_targets=False)
     
     const.OUTPUT_DIR.mkdir(exist_ok=True)
@@ -350,10 +348,11 @@ def rescue_after_ota(dev: device.DeviceController) -> None:
             utils.ui.echo(get_string("rescue_patching_slot").format(slot=slot))
             edit_vendor_boot(str(vb_path))
         except Exception as e:
-            utils.ui.echo(f"Skipping {slot} due to patch error or no change: {e}")
+            utils.ui.echo(f"Skipping {slot}: {e}")
             continue
 
         if not prc_temp.exists():
+            utils.ui.echo(f"No changes for {slot}, skipping flash.")
             continue
 
         dest_vb = const.OUTPUT_DIR / f"{vb_target}.img"
@@ -361,10 +360,9 @@ def rescue_after_ota(dev: device.DeviceController) -> None:
         patched_map[vb_target] = dest_vb
         
         utils.ui.echo(get_string("rescue_remaking_vbmeta").format(slot=slot))
-        
+
         vbmeta_info = extract_image_avb_info(vbmeta_path)
         vb_info = extract_image_avb_info(vb_path)
-
         part_size = vb_info.get('partition_size', vb_info.get('data_size'))
         
         cmd_footer = [
@@ -375,13 +373,8 @@ def rescue_after_ota(dev: device.DeviceController) -> None:
             "--rollback_index", vb_info.get('rollback', '0'),
             "--salt", vb_info.get('salt', '')
         ]
-        
-        if 'props_args' in vb_info:
-            cmd_footer.extend(vb_info['props_args'])
-        
-        if 'flags' in vb_info:
-            cmd_footer.extend(["--flags", vb_info['flags']])
-            
+        if 'props_args' in vb_info: cmd_footer.extend(vb_info['props_args'])
+        if 'flags' in vb_info: cmd_footer.extend(["--flags", vb_info['flags']])
         utils.run_command(cmd_footer)
         
         pubkey = vbmeta_info.get('pubkey_sha1')
@@ -391,7 +384,6 @@ def rescue_after_ota(dev: device.DeviceController) -> None:
              continue
              
         dest_vbmeta = const.OUTPUT_DIR / f"{vbmeta_target}.img"
-        
         cmd_make = [
             str(const.PYTHON_EXE), str(const.AVBTOOL_PY), "make_vbmeta_image",
             "--output", str(dest_vbmeta),
@@ -404,6 +396,7 @@ def rescue_after_ota(dev: device.DeviceController) -> None:
             "--include_descriptors_from_image", str(dest_vb)
         ]
         utils.run_command(cmd_make)
+
         patched_map[vbmeta_target] = dest_vbmeta
 
     if not patched_map:
@@ -411,10 +404,6 @@ def rescue_after_ota(dev: device.DeviceController) -> None:
         return
 
     utils.ui.echo(get_string("rescue_wait_adb_flash"))
-    dev.wait_for_adb()
-    
-    utils.ui.echo(get_string("rescue_reboot_edl"))
-    dev.reboot_to_edl()
     
     port = edl._prepare_edl_session(dev)
     
