@@ -163,7 +163,7 @@ def select_country_code(prompt_message: str = "Please select a country from the 
 
     sorted_countries = const.SORTED_COUNTRY_CODES
     
-    num_cols = 3
+    num_cols = 2
     col_width = 38 
     
     line_width = col_width * num_cols
