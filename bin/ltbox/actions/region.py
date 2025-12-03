@@ -410,9 +410,7 @@ def rescue_after_ota(dev: device.DeviceController) -> None:
     port = edl._prepare_edl_session(dev)
     
     for target, path in patched_map.items():
-        utils.ui.echo(get_string("rescue_flashing_target").format(target=target))
-        params = ensure_params_or_fail(target)
-        dev.edl_write_partition(port, path, params['lun'], params['start_sector'])
+        edl.flash_partition_target(dev, port, target, path)
         
     utils.ui.echo(get_string("act_reset_sys"))
     dev.edl_reset(port)

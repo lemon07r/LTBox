@@ -7,11 +7,11 @@ import traceback
 from pathlib import Path
 from typing import Optional, List, Tuple
 
+from . import xml
 from .. import constants as const
 from .. import utils, device
 from ..partition import ensure_params_or_fail
 from ..i18n import get_string
-from . import xml
 
 def ensure_loader_file() -> None:
     if not const.EDL_LOADER_FILE.exists():
@@ -34,6 +34,25 @@ def _prepare_edl_session(dev: device.DeviceController) -> str:
         utils.ui.echo(get_string("act_warn_prog_load").format(e=e))
         
     return port
+
+def flash_partition_target(dev: device.DeviceController, port: str, target_name: str, image_path: Path) -> None:
+    utils.ui.echo(get_string("act_flashing_target").format(target=target_name))
+    
+    params = ensure_params_or_fail(target_name)
+    utils.ui.echo(get_string("act_found_dump_info").format(
+        xml=params['source_xml'], 
+        lun=params['lun'], 
+        start=params['start_sector']
+    ))
+    
+    utils.ui.echo(get_string("device_flashing_part").format(filename=image_path.name, lun=params['lun'], start=params['start_sector']))
+    dev.edl_write_partition(
+        port=port,
+        image_path=image_path,
+        lun=params['lun'],
+        start_sector=params['start_sector']
+    )
+    utils.ui.echo(get_string("device_flash_success").format(filename=image_path.name))
 
 def dump_partitions(dev: device.DeviceController, skip_reset: bool = False, additional_targets: Optional[List[str]] = None, default_targets: bool = True) -> None:
     utils.ui.echo(get_string("act_start_dump"))
@@ -128,20 +147,8 @@ def flash_partitions(dev: device.DeviceController, skip_reset: bool = False, ski
             utils.ui.echo(get_string(f"act_skip_{target}"))
             continue
 
-        utils.ui.echo(get_string("act_flashing_target").format(target=target))
-
         try:
-            params = ensure_params_or_fail(target)
-            utils.ui.echo(get_string("act_found_boot_info").format(lun=params['lun'], start=params['start_sector']))
-            
-            utils.ui.echo(get_string("device_flashing_part").format(filename=image_path.name, lun=params['lun'], start=params['start_sector']))
-            dev.edl_write_partition(
-                port=port,
-                image_path=image_path,
-                lun=params['lun'],
-                start_sector=params['start_sector']
-            )
-            utils.ui.echo(get_string(f"act_flash_{target}_ok"))
+            flash_partition_target(dev, port, target, image_path)
 
         except (subprocess.CalledProcessError, FileNotFoundError, ValueError) as e:
             utils.ui.error(get_string("act_err_edl_write").format(e=e))
@@ -198,31 +205,8 @@ def write_anti_rollback(dev: device.DeviceController, skip_reset: bool = False) 
 
         utils.ui.echo(get_string("act_arb_write_step3").format(slot=active_slot))
 
-        utils.ui.echo(get_string("act_write_boot").format(target=target_boot))
-        params_boot = ensure_params_or_fail(target_boot)
-        utils.ui.echo(get_string("act_found_boot_info").format(lun=params_boot['lun'], start=params_boot['start_sector']))
-        
-        utils.ui.echo(get_string("device_flashing_part").format(filename=boot_img.name, lun=params_boot['lun'], start=params_boot['start_sector']))
-        dev.edl_write_partition(
-            port=port,
-            image_path=boot_img,
-            lun=params_boot['lun'],
-            start_sector=params_boot['start_sector']
-        )
-        utils.ui.echo(get_string("act_write_boot_ok").format(target=target_boot))
-
-        utils.ui.echo(get_string("act_write_vbmeta").format(target=target_vbmeta))
-        params_vbmeta = ensure_params_or_fail(target_vbmeta)
-        utils.ui.echo(get_string("act_found_vbmeta_info").format(lun=params_vbmeta['lun'], start=params_vbmeta['start_sector']))
-        
-        utils.ui.echo(get_string("device_flashing_part").format(filename=vbmeta_img.name, lun=params_vbmeta['lun'], start=params_vbmeta['start_sector']))
-        dev.edl_write_partition(
-            port=port,
-            image_path=vbmeta_img,
-            lun=params_vbmeta['lun'],
-            start_sector=params_vbmeta['start_sector']
-        )
-        utils.ui.echo(get_string("act_write_vbmeta_ok").format(target=target_vbmeta))
+        flash_partition_target(dev, port, target_boot, boot_img)
+        flash_partition_target(dev, port, target_vbmeta, vbmeta_img)
 
         if not skip_reset:
             utils.ui.echo(get_string("act_arb_reset"))

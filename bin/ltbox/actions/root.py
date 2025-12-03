@@ -482,31 +482,17 @@ def root_device(dev: device.DeviceController, gki: bool = False) -> None:
     except Exception as e:
         utils.ui.echo(get_string("act_warn_prog_load").format(e=e))
 
-    if not params:
-         params = ensure_params_or_fail(target_partition)
-    if not gki:
-        if not params_vbmeta:
-             params_vbmeta = ensure_params_or_fail(target_vbmeta_partition)
-
     try:
-        dev.edl_write_partition(
-            port=port,
-            image_path=final_boot_img,
-            lun=params['lun'],
-            start_sector=params['start_sector']
-        )
+        edl.flash_partition_target(dev, port, target_partition, final_boot_img)
+
+        if not gki:
+            edl.flash_partition_target(dev, port, target_vbmeta_partition, final_vbmeta_img)
+            utils.ui.echo(get_string("act_flash_boot_ok").format(part=target_vbmeta_partition))
+
         if gki:
             utils.ui.echo(get_string("act_flash_boot_ok").format(part=target_partition))
         else:
             utils.ui.echo(get_string("act_flash_init_boot_ok").format(part=target_partition))
-            
-            dev.edl_write_partition(
-                port=port,
-                image_path=final_vbmeta_img,
-                lun=params_vbmeta['lun'],
-                start_sector=params_vbmeta['start_sector']
-            )
-            utils.ui.echo(get_string("act_flash_boot_ok").format(part=target_vbmeta_partition))
 
         utils.ui.echo(get_string("act_reset_sys"))
         dev.edl_reset(port)
@@ -604,39 +590,17 @@ def unroot_device(dev: device.DeviceController) -> None:
             target_vbmeta = f"vbmeta{suffix}"
             utils.ui.echo(get_string("act_unroot_step4_lkm"))
 
-            params_init = ensure_params_or_fail(target_init_boot)
-            utils.ui.echo(get_string("act_found_dump_info").format(xml=params_init['source_xml'], lun=params_init['lun'], start=params_init['start_sector']))
-            dev.edl_write_partition(
-                port=port,
-                image_path=lkm_init_boot_file,
-                lun=params_init['lun'],
-                start_sector=params_init['start_sector']
-            )
+            edl.flash_partition_target(dev, port, target_init_boot, lkm_init_boot_file)
             utils.ui.echo(get_string("act_flash_stock_init_boot_ok").format(part=target_init_boot))
 
-            params_vbmeta = ensure_params_or_fail(target_vbmeta)
-            utils.ui.echo(get_string("act_found_dump_info").format(xml=params_vbmeta['source_xml'], lun=params_vbmeta['lun'], start=params_vbmeta['start_sector']))
-            dev.edl_write_partition(
-                port=port,
-                image_path=lkm_vbmeta_file,
-                lun=params_vbmeta['lun'],
-                start_sector=params_vbmeta['start_sector']
-            )
+            edl.flash_partition_target(dev, port, target_vbmeta, lkm_vbmeta_file)
             utils.ui.echo(get_string("act_flash_stock_vbmeta_ok").format(part=target_vbmeta))
             
         elif unroot_mode == "gki":
             target_boot = f"boot{suffix}"
             utils.ui.echo(get_string("act_unroot_step4_gki").format(part=target_boot))
             
-            params = ensure_params_or_fail(target_boot)
-            utils.ui.echo(get_string("act_found_dump_info").format(xml=params['source_xml'], lun=params['lun'], start=params['start_sector']))
-            
-            dev.edl_write_partition(
-                port=port,
-                image_path=gki_boot_file,
-                lun=params['lun'],
-                start_sector=params['start_sector']
-            )
+            edl.flash_partition_target(dev, port, target_boot, gki_boot_file)
             utils.ui.echo(get_string("act_flash_stock_boot_ok").format(part=target_boot))
         
         utils.ui.echo(get_string("act_reset_sys"))
