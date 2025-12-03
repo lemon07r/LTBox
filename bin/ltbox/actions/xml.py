@@ -10,12 +10,19 @@ from ..crypto import decrypt_file
 from ..i18n import get_string
 
 def auto_decrypt_if_needed() -> None:
-    if list(const.IMAGE_DIR.glob("rawprogram*.xml")) or list(const.OUTPUT_XML_DIR.glob("rawprogram*.xml")):
-        return
-
     x_files = list(const.IMAGE_DIR.glob("rawprogram*.x"))
     if not x_files:
         return
+
+    xml_files = list(const.IMAGE_DIR.glob("rawprogram*.xml"))
+    if xml_files:
+        print("Cleaning up ALL existing XML files to prevent pollution...")
+        for xml_file in xml_files:
+            try:
+                xml_file.unlink()
+            except OSError as e:
+                print(f"Warning: Failed to delete {xml_file.name}: {e}")
+        print("-" * 60)
 
     print(get_string("img_xml_scan"))
     
@@ -41,9 +48,9 @@ def ensure_xml_files() -> None:
     def _check_xml_ready(path: Path, _: Optional[List[str]]) -> bool:
         if list(const.IMAGE_DIR.glob("rawprogram*.xml")) or list(const.OUTPUT_XML_DIR.glob("rawprogram*.xml")):
             return True
-
+        
         auto_decrypt_if_needed()
-
+        
         if list(const.IMAGE_DIR.glob("rawprogram*.xml")) or list(const.OUTPUT_XML_DIR.glob("rawprogram*.xml")):
             return True
             
@@ -70,6 +77,18 @@ def decrypt_x_files() -> None:
     print(get_string("img_xml_scan"))
     
     x_files = list(const.IMAGE_DIR.glob("*.x"))
+
+    if x_files:
+        print("Checking for potential file conflicts...")
+        existing_xmls = list(const.IMAGE_DIR.glob("*.xml"))
+        if existing_xmls:
+            print("  Cleaning up ALL existing XML files to ensure clean decryption...")
+            for xml_file in existing_xmls:
+                try:
+                    xml_file.unlink()
+                except OSError as e:
+                    print(f"  Warning: Failed to delete {xml_file.name}: {e}")
+
     xml_files = list(const.IMAGE_DIR.glob("*.xml"))
     
     processed_files = False
