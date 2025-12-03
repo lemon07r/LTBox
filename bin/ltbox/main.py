@@ -2,6 +2,7 @@ import os
 import platform
 import subprocess
 import sys
+import json
 from pathlib import Path
 from datetime import datetime
 from typing import Tuple, Dict, Callable, Any
@@ -14,6 +15,7 @@ from .utils import ui
 APP_DIR = Path(__file__).parent.resolve()
 BASE_DIR = APP_DIR.parent
 PYTHON_EXE = BASE_DIR / "python3" / "python.exe"
+SETTINGS_FILE = APP_DIR / "settings.json"
 
 try:
     from .errors import ToolError
@@ -22,6 +24,24 @@ except ImportError:
     print(get_string("err_ensure_errors"), file=sys.stderr)
     input(get_string("press_enter_to_exit"))
     sys.exit(1)
+
+def _load_settings() -> Dict[str, Any]:
+    if SETTINGS_FILE.exists():
+        try:
+            with open(SETTINGS_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception:
+            return {}
+    return {}
+
+def _save_settings(data: Dict[str, Any]) -> None:
+    try:
+        current_settings = _load_settings()
+        current_settings.update(data)
+        with open(SETTINGS_FILE, 'w', encoding='utf-8') as f:
+            json.dump(current_settings, f, indent=2)
+    except Exception as e:
+        print(f"Warning: Failed to save settings: {e}", file=sys.stderr)
 
 def _check_platform():
     if platform.system() != "Windows":
@@ -94,7 +114,7 @@ def run_task(command, title, dev, command_map, extra_kwargs=None):
             "patch_root_image_file_gki", "patch_root_image_file_lkm", 
             "edit_dp", 
             "patch_anti_rollback", "clean", "modify_xml", "modify_xml_wipe",
-            "decrypt_xml"
+            "decrypt_xml", "change_language"
         }
         
         if command not in no_dev_needed:
@@ -219,6 +239,7 @@ def print_main_menu(skip_adb, skip_rollback):
     print(f"  {get_string('menu_main_sub_settings')}")
     print(get_string("menu_main_skip_adb").format(skip_adb_state=skip_adb_state))
     print(get_string("menu_main_skip_rb").format(skip_rb_state=skip_rb_state))
+    print(get_string("menu_main_language"))
     print("")
 
     print(f"  {get_string('menu_main_sub_nav')}")
@@ -367,6 +388,11 @@ def root_menu(dev, command_map, gki: bool):
             print(get_string("menu_root_invalid"))
             input(get_string("press_enter_to_continue"))
 
+def change_language_task():
+    new_lang = prompt_for_language(force_prompt=True)
+    i18n.load_lang(new_lang)
+    return get_string("lang_changed")
+
 def main_loop(device_controller_class, command_map):
     skip_adb = False
     skip_rollback = False
@@ -378,6 +404,7 @@ def main_loop(device_controller_class, command_map):
         "3": ("disable_ota", get_string("task_title_disable_ota")),
         "4": ("rescue_ota", get_string("task_title_rescue")),
         "6": ("unroot_device", get_string("task_title_unroot")),
+        "9": ("change_language", get_string("task_title_change_lang")),
     }
 
     while True:
@@ -405,7 +432,21 @@ def main_loop(device_controller_class, command_map):
             print(get_string("menu_main_invalid"))
             input(get_string("press_enter_to_continue"))
 
-def prompt_for_language() -> str:
+def prompt_for_language(force_prompt: bool = False) -> str:
+    if not force_prompt:
+        settings = _load_settings()
+        saved_lang = settings.get("language")
+
+        if saved_lang:
+            try:
+                available_languages = i18n.get_available_languages()
+                avail_codes = [code for code, _ in available_languages]
+                
+                if saved_lang in avail_codes:
+                    return saved_lang
+            except Exception:
+                pass
+
     i18n.load_lang("en")
     
     try:
@@ -444,7 +485,11 @@ def prompt_for_language() -> str:
         if choice not in lang_map:
             print(get_string("menu_lang_invalid").format(len=len(lang_map)))
     
-    return lang_map[choice]
+    selected_lang = lang_map[choice]
+
+    _save_settings({"language": selected_lang})
+    
+    return selected_lang
 
 def entry_point():
     try:
@@ -497,6 +542,7 @@ def entry_point():
                 "flash_full_firmware": (a.flash_full_firmware, {}),
                 "patch_all": (w.patch_all, {"wipe": 0}),
                 "patch_all_wipe": (w.patch_all, {"wipe": 1}),
+                "change_language": (change_language_task, {}),
             }
             
             device_controller_class = d.DeviceController
