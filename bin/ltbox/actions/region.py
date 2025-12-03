@@ -341,7 +341,7 @@ def rescue_after_ota(dev: device.DeviceController) -> None:
         if not vb_path.exists() or not vbmeta_path.exists():
             continue
 
-        prc_temp = const.BASE_DIR / const.FN_VENDOR_BOOT_PRC
+        prc_temp = vb_path.parent / const.FN_VENDOR_BOOT_PRC
         prc_temp.unlink(missing_ok=True)
 
         try:
