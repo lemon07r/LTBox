@@ -3,6 +3,7 @@ import shutil
 import subprocess
 import sys
 import time
+import traceback
 from pathlib import Path
 from typing import Optional, List, Tuple
 
@@ -351,11 +352,12 @@ def flash_full_firmware(dev: device.DeviceController, skip_reset: bool = False, 
     raw_xmls, patch_xmls = _select_flash_xmls(skip_dp)
         
     utils.ui.echo(get_string("act_flash_step1"))
-    
+
     try:
-        dev.edl_rawprogram(loader_path, "UFS", raw_xmls, patch_xmls, port)
-    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        dev.edl_rawprogram(const.EDL_LOADER_FILE, "UFS", raw_xmls, patch_xmls, port)
+    except Exception as e:
         utils.ui.error(get_string("act_err_main_flash").format(e=e))
+        utils.ui.error("Detailed Traceback:\n" + traceback.format_exc())
         utils.ui.echo(get_string("act_warn_unstable"))
         raise
         
