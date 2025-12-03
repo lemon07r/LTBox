@@ -5,7 +5,7 @@ import sys
 import time
 import serial.tools.list_ports
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional, List, Callable, Any
 
 import adbutils
 from adbutils import AdbError
@@ -15,6 +15,21 @@ from . import utils
 from .errors import ToolError
 from .i18n import get_string
 from .utils import ui
+
+def _wait_loop(
+    predicate: Callable[[], Any],
+    interval: float = 1.0,
+    on_loop: Optional[Callable[[], None]] = None
+) -> Any:
+    while True:
+        res = predicate()
+        if res:
+            return res
+        
+        if on_loop:
+            on_loop()
+            
+        time.sleep(interval)
 
 class AdbManager:
     def __init__(self, skip_adb: bool):
@@ -45,20 +60,22 @@ class AdbManager:
         else:
             print("  " + get_string("device_wait_adb_loop") + "...", end="\r")
         
+        def _check_adb():
+            try:
+                for d in adbutils.adb.device_list():
+                    if d.get_state() == 'device':
+                        return True
+            except Exception:
+                pass
+            return False
+
         try:
-            while True:
-                try:
-                    for d in adbutils.adb.device_list():
-                        if d.get_state() == 'device':
-                            if not self.connected_once:
-                                ui.info(get_string("device_adb_connected"))
-                            self.connected_once = True
-                            print(" " * 40, end="\r")
-                            return
-                except Exception:
-                    pass
-                
-                time.sleep(1)
+            _wait_loop(_check_adb, interval=1.0)
+            
+            if not self.connected_once:
+                ui.info(get_string("device_adb_connected"))
+            self.connected_once = True
+            print(" " * 40, end="\r")
                 
         except KeyboardInterrupt:
             ui.warn("\n" + get_string("device_wait_cancelled"))
@@ -213,15 +230,16 @@ class FastbootManager:
             ui.info(get_string("device_fastboot_connected"))
             return True
         
-        while not self.check_device(silent=True):
+        def _loop_msg():
             ui.info(get_string("device_wait_fastboot_loop"))
-            try:
-                time.sleep(2)
-            except KeyboardInterrupt:
-                ui.warn(get_string("device_wait_fastboot_cancel"))
-                raise
-        ui.info(get_string("device_fastboot_connected"))
-        return True
+
+        try:
+            _wait_loop(lambda: self.check_device(silent=True), interval=2.0, on_loop=_loop_msg)
+            ui.info(get_string("device_fastboot_connected"))
+            return True
+        except KeyboardInterrupt:
+            ui.warn(get_string("device_wait_fastboot_cancel"))
+            raise
 
     def reboot_system(self) -> None:
         try:
@@ -260,15 +278,16 @@ class EdlManager:
         if port_name:
             return port_name
         
-        while not (port_name := self.check_device(silent=True)):
+        def _loop_msg():
             ui.info(get_string("device_wait_edl_loop"))
-            try:
-                time.sleep(2)
-            except KeyboardInterrupt:
-                ui.warn(get_string("device_wait_edl_cancel"))
-                raise
-        ui.info(get_string("device_edl_connected").format(port=port_name))
-        return port_name
+
+        try:
+            port_name = _wait_loop(lambda: self.check_device(silent=True), interval=2.0, on_loop=_loop_msg)
+            ui.info(get_string("device_edl_connected").format(port=port_name))
+            return port_name
+        except KeyboardInterrupt:
+            ui.warn(get_string("device_wait_edl_cancel"))
+            raise
 
     def load_programmer(self, port: str, loader_path: Path) -> None:
         if not const.QSAHARASERVER_EXE.exists():
