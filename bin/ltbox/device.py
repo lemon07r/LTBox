@@ -1,7 +1,5 @@
-import os
 import re
 import subprocess
-import sys
 import time
 import serial.tools.list_ports
 from pathlib import Path
@@ -12,7 +10,7 @@ from adbutils import AdbError
 
 from . import constants as const
 from . import utils
-from .errors import ToolError
+from .errors import DeviceError, DeviceConnectionError, DeviceCommandError, ToolError
 from .i18n import get_string
 from .utils import ui
 
@@ -91,7 +89,7 @@ class AdbManager:
             d = self._get_device()
             return d.prop.model if d else None
         except Exception as e:
-            raise ToolError(get_string("device_err_get_model").format(e=e))
+            raise DeviceConnectionError(get_string("device_err_get_model").format(e=e), e)
 
     def get_slot_suffix(self) -> Optional[str]:
         if not self.wait_for_device():
@@ -103,28 +101,28 @@ class AdbManager:
                 return suffix if suffix in ["_a", "_b"] else None
             return None
         except Exception as e:
-            raise ToolError(get_string("device_err_get_slot").format(e=e))
+            raise DeviceConnectionError(get_string("device_err_get_slot").format(e=e), e)
 
     def get_kernel_version(self) -> str:
         if not self.wait_for_device():
-             raise ToolError(get_string("dl_lkm_kver_fail").format(ver="SKIP_ADB"))
+             raise DeviceConnectionError(get_string("dl_lkm_kver_fail").format(ver="SKIP_ADB"))
         
         print(get_string("dl_lkm_get_kver"))
         try:
             d = self._get_device()
             if not d:
-                raise ToolError(get_string("device_err_wait_adb").format(e="No device"))
+                raise DeviceConnectionError(get_string("device_err_wait_adb").format(e="No device"))
 
             version_string = d.shell("cat /proc/version")
             match = re.search(r"Linux version (\d+\.\d+)", version_string)
             if not match:
-                raise ToolError(get_string("dl_lkm_kver_fail").format(ver=version_string))
+                raise DeviceCommandError(get_string("dl_lkm_kver_fail").format(ver=version_string))
             
             ver = match.group(1)
             print(get_string("dl_lkm_kver_found").format(ver=ver))
             return ver
         except Exception as e:
-             raise ToolError(get_string("dl_lkm_kver_fail").format(ver=str(e)))
+             raise DeviceCommandError(get_string("dl_lkm_kver_fail").format(ver=str(e)), e)
 
     def reboot(self, target: str) -> None:
         if not self.wait_for_device():
@@ -152,7 +150,7 @@ class AdbManager:
                 else:
                     d.shell(f"reboot {target}")
         except Exception as e:
-            raise ToolError(get_string("device_err_reboot").format(e=e))
+            raise DeviceCommandError(get_string("device_err_reboot").format(e=e), e)
 
     def install(self, apk_path: str) -> None:
         if self.wait_for_device():
@@ -190,7 +188,7 @@ class FastbootManager:
             ui.warn(get_string("device_warn_slot_fastboot").format(snippet=output.splitlines()[0] if output else 'None'))
             return None
         except (subprocess.CalledProcessError, FileNotFoundError) as e:
-            raise ToolError(get_string("device_err_get_slot_fastboot").format(e=e))
+            raise DeviceCommandError(get_string("device_err_get_slot_fastboot").format(e=e), e)
 
     def check_device(self, silent: bool = False) -> bool:
         if not silent:
@@ -237,7 +235,7 @@ class FastbootManager:
                 args.append("bootloader")
             utils.run_command(args)
         except (subprocess.CalledProcessError, FileNotFoundError) as e:
-            raise ToolError(get_string("device_err_reboot").format(e=e))
+            raise DeviceCommandError(get_string("device_err_reboot").format(e=e), e)
 
 class EdlManager:
     def check_device(self, silent: bool = False) -> Optional[str]:
@@ -302,7 +300,7 @@ class EdlManager:
             msg += f"\n{get_string('device_cause_2')}"
             msg += f"\n{get_string('device_cause_3')}"
             msg += f"\nError: {e}"
-            raise ToolError(msg)
+            raise DeviceCommandError(msg, e)
 
     def load_programmer_safe(self, port: str, loader_path: Path) -> None:
         ui.info(get_string("device_upload_programmer").format(port=port))
@@ -336,7 +334,7 @@ class EdlManager:
         try:
             utils.run_command(cmd_fh, cwd=dest_dir, check=True)
         except (subprocess.CalledProcessError, FileNotFoundError) as e:
-            raise ToolError(get_string("device_err_fh_exec").format(e=e))
+            raise DeviceCommandError(get_string("device_err_fh_exec").format(e=e), e)
 
     def write_partition(self, port: str, image_path: Path, lun: str, start_sector: str, memory_name: str = "UFS") -> None:
         if not const.EDL_EXE.exists():
@@ -363,7 +361,7 @@ class EdlManager:
             utils.run_command(cmd_fh, cwd=work_dir, check=True)
             ui.info(get_string("device_flash_success").format(filename=filename))
         except (subprocess.CalledProcessError, FileNotFoundError) as e:
-            raise ToolError(get_string("device_err_flash_exec").format(e=e))
+            raise DeviceCommandError(get_string("device_err_flash_exec").format(e=e), e)
 
     def reset(self, port: str) -> None:
         if not const.EDL_EXE.exists():
@@ -380,7 +378,7 @@ class EdlManager:
         try:
             utils.run_command(cmd_fh)
         except (subprocess.CalledProcessError, FileNotFoundError) as e:
-            raise ToolError(get_string("device_err_reset_fail").format(e=e))
+            raise DeviceCommandError(get_string("device_err_reset_fail").format(e=e), e)
 
     def flash_rawprogram(self, port: str, loader_path: Path, memory_type: str, raw_xmls: List[Path], patch_xmls: List[Path]) -> None:
         if not const.QSAHARASERVER_EXE.exists() or not const.EDL_EXE.exists():
@@ -413,7 +411,7 @@ class EdlManager:
         try:
             utils.run_command(cmd_fh)
         except (subprocess.CalledProcessError, FileNotFoundError) as e:
-            raise ToolError(get_string("device_err_rawprogram_fail").format(e=e))
+            raise DeviceCommandError(get_string("device_err_rawprogram_fail").format(e=e), e)
 
 class DeviceController:
     def __init__(self, skip_adb: bool = False):

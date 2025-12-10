@@ -18,7 +18,7 @@ PYTHON_EXE = BASE_DIR / "python3" / "python.exe"
 SETTINGS_FILE = APP_DIR / "settings.json"
 
 try:
-    from .errors import ToolError
+    from .errors import ToolError, LTBoxError, UserCancelError
 except ImportError:
     print(get_string("err_import_critical"), file=sys.stderr)
     print(get_string("err_ensure_errors"), file=sys.stderr)
@@ -185,7 +185,7 @@ def run_task(command, title, dev, command_map, extra_kwargs=None):
         elif result:
             ui.echo(get_string("act_unhandled_success_result").format(res=result))
 
-    except ToolError as e:
+    except LTBoxError as e:
         ui.box_output([get_string("task_failed").format(title=title), str(e)], err=True)
     except subprocess.CalledProcessError as e:
         msgs = [get_string("err_cmd_failed").format(cmd=" ".join(e.cmd) if isinstance(e.cmd, list) else e.cmd)]
@@ -574,7 +574,7 @@ def entry_point():
         else:
             main_loop(device_controller_class, COMMAND_MAP)
 
-    except (RuntimeError, ToolError) as e:
+    except (LTBoxError, RuntimeError) as e:
         ui.error(get_string("err_fatal_abort"))
         ui.error(get_string("err_fatal_details").format(e=e))
         input(get_string("press_enter_to_exit"))

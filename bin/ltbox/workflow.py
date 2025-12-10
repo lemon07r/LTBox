@@ -6,7 +6,7 @@ from typing import Optional, Tuple
 from . import constants as const
 from . import utils, device, actions
 from .context import TaskContext
-from .errors import ToolError
+from .errors import LTBoxError, UserCancelError, DeviceError
 from .i18n import get_string
 from .logger import logging_context
 
@@ -24,7 +24,7 @@ def _cleanup_previous_outputs(ctx: TaskContext) -> None:
             try:
                 shutil.rmtree(folder)
             except OSError as e:
-                raise ToolError(get_string('wf_remove_error').format(name=folder.name, e=e))
+                raise LTBoxError(get_string('wf_remove_error').format(name=folder.name, e=e), e)
 
 def _populate_device_info(ctx: TaskContext) -> None:
     ctx.active_slot_suffix = ctx.dev.detect_active_slot()
@@ -33,9 +33,9 @@ def _populate_device_info(ctx: TaskContext) -> None:
         try:
             ctx.device_model = ctx.dev.get_device_model()
             if not ctx.device_model:
-                raise ToolError(get_string('wf_err_adb_model'))
+                raise DeviceError(get_string('wf_err_adb_model'))
         except Exception as e:
-             raise ToolError(get_string('wf_err_get_model').format(e=e))
+             raise DeviceError(get_string('wf_err_get_model').format(e=e), e)
 
 def _wait_for_input_images(ctx: TaskContext) -> None:
     prompt = get_string('act_prompt_image')
@@ -105,7 +105,7 @@ def _check_and_patch_arb(ctx: TaskContext, boot_target: str, vbmeta_target: str)
     )
     
     if arb_status_result[0] == 'ERROR':
-        raise ToolError(get_string('wf_step8_err_arb_abort'))
+        raise LTBoxError(get_string('wf_step8_err_arb_abort'))
 
     actions.patch_anti_rollback(comparison_result=arb_status_result)
 
@@ -113,7 +113,6 @@ def _flash_images(ctx: TaskContext, skip_dp_workflow: bool) -> None:
     actions.flash_full_firmware(dev=ctx.dev, skip_reset_edl=True, skip_dp=skip_dp_workflow)
 
 def patch_all(dev: device.DeviceController, wipe: int = 0, skip_rollback: bool = False) -> str:
-    # Initialize Context
     ctx = TaskContext(
         dev=dev, 
         wipe=wipe, 
@@ -177,12 +176,15 @@ def patch_all(dev: device.DeviceController, wipe: int = 0, skip_rollback: bool =
             success_msg += f"\n\n{get_string('wf_notice_widevine')}"
             return success_msg
 
-    except (subprocess.CalledProcessError, FileNotFoundError, RuntimeError, KeyError, ToolError) as e:
+    except LTBoxError as e:
+        utils.ui.echo(get_string('wf_err_halted'), err=True)
+        raise e
+    except (subprocess.CalledProcessError, FileNotFoundError, RuntimeError, KeyError) as e:
         utils.ui.echo(get_string('wf_err_halted'), err=True)
         raise e
     except SystemExit as e:
-        raise ToolError(get_string('wf_err_halted_script').format(e=e))
+        raise LTBoxError(get_string('wf_err_halted_script').format(e=e), e)
     except KeyboardInterrupt:
-        raise ToolError(get_string('act_op_cancel'))
+        raise UserCancelError(get_string('act_op_cancel'))
     finally:
         utils.ui.info(get_string("logging_finished").format(log_file=log_file))
